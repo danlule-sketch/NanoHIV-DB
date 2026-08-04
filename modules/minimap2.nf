@@ -1,36 +1,29 @@
 process MINIMAP2 {
 
-    tag "${barcode}"
+    tag "${reads.simpleName}"
 
-    publishDir "${params.outdir}/07_minimap2", mode: "copy"
+    cpus 8
+
+    publishDir "${params.outdir}/06_minimap2", mode: 'copy'
 
     input:
-    tuple val(barcode), path(reference), path(reads)
-
-    val threads
+    tuple path(reference), path(reads)
 
     output:
-    path "${barcode}.sorted.bam"
-    path "${barcode}.sorted.bam.bai"
+    path "${reads.simpleName}.bam"
+    path "${reads.simpleName}.bam.bai"
 
     script:
     """
-    echo "Processing ${barcode}"
-
-    # Index reference if needed
-    samtools faidx ${reference}
-
-    minimap2 -d ${reference}.mmi ${reference}
-
-    # Align reads
-    minimap2 -ax map-ont \
-        ${reference}.mmi \
+    minimap2 \
+        -ax map-ont \
+        -t ${task.cpus} \
+        ${reference} \
         ${reads} \
         | samtools sort \
-        -@ ${threads} \
-        -o ${barcode}.sorted.bam
+        -@ ${task.cpus} \
+        -o ${reads.simpleName}.bam
 
-    # Index BAM
-    samtools index ${barcode}.sorted.bam
+    samtools index ${reads.simpleName}.bam
     """
 }

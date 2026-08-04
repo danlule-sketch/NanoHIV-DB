@@ -1,12 +1,11 @@
 process CODFREQ {
 
-    container 'hivdb/codfreq:latest'
+    container "hivdb/codfreq:latest"
 
-    publishDir "${params.outdir}/codfreq", mode: "copy"
+    publishDir "${params.outdir}/08_codfreq", mode: 'copy'
 
     input:
-    path bam
-    path reference
+    tuple path(bam), path(reference)
 
     output:
     path "*.codfreq"

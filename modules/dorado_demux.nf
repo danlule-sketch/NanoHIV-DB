@@ -1,21 +1,21 @@
 process DORADO_DEMUX {
 
-    tag "Demultiplexing"
+    tag "demultiplex"
 
-    publishDir "${params.outdir}/02_demultiplexed", mode: "copy"
+    publishDir "${params.outdir}/02_demultiplexed", mode: 'copy'
 
     input:
-    path bam_dir
+    path bam
 
     output:
-    path "demultiplexed"
+    path "demultiplexed/*.fastq"
 
     script:
     """
     dorado demux \
-        --kit-name ${params.kit_name} \
+        ${bam} \
         --emit-fastq \
-        --output-dir demultiplexed \
-        ${bam_dir}
+        --kit-name ${params.kit_name} \
+        --output-dir demultiplexed
     """
 }

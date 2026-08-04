@@ -1,8 +1,10 @@
 process DORADO_BASECALL {
 
-    tag "Basecalling"
+    tag "basecalling"
 
-    publishDir "${params.outdir}/01_basecalled", mode: "copy"
+    cpus 8
+
+    publishDir "${params.outdir}/01_basecalled", mode: 'copy'
 
     input:
     path pod5_dir
