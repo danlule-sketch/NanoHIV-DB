@@ -27,4 +27,4 @@ The following software must be installed:
 https://www.docker.com/products/docker-desktop/
 
 Check installation
-'''docker --version'''
+'docker --version'
