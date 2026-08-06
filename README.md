@@ -19,12 +19,20 @@ NanoHIV-DR is a Nextflow-based pipeline designed to analyse Oxford Nanopore HIV 
 The pipeline is containerised using Docker to ensure reproducibility.
 
 ##Worfkflow Overview
-<img width="481" height="640" alt="Screenshot 2026-08-06 at 16 29 06" src="https://github.com/user-attachments/assets/3755ccff-cd1f-4721-a28c-8b777f009516" />
+<img width="328" height="828" alt="Screenshot 2026-08-06 at 17 06 05" src="https://github.com/user-attachments/assets/e1098c2b-b3f7-4dc7-8710-b3983b25a418" />
 
 #Requirements
 The following software must be installed:
-## Docker
+## 1. Docker
 https://www.docker.com/products/docker-desktop/
 
 Check installation
 'docker --version'
+
+## 2. Nextflow
+### Install Nextflow:
+'curl -s https://get.nextflow.io | bash'
+
+### Move Nextflow into your PATH:
+'sudo mv nextflow /usr/local/bin/'
+
