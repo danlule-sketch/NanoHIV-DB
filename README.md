@@ -42,6 +42,7 @@ Check installation
 'git clone https://github.com/YOUR_USERNAME/NanoHIV-DR.git'
 
 ### Move into the pipeline directory:
+
 'cd NanoHIV-DR'
 
 <img width="306" height="729" alt="Screenshot 2026-08-06 at 17 26 18" src="https://github.com/user-attachments/assets/5642400c-4fda-46ce-8140-ade10dcaccbc" />
