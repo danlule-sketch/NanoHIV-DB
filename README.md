@@ -43,7 +43,109 @@ Check installation
 
 ### Move into the pipeline directory:
 'cd NanoHIV-DR'
+
 <img width="306" height="729" alt="Screenshot 2026-08-06 at 17 26 18" src="https://github.com/user-attachments/assets/5642400c-4fda-46ce-8140-ade10dcaccbc" />
+
+### Note: 
+The images logoUVRI.png and logoCVR can be replaced with your institutional images to customise your reporting.
+
+# Build the Docker image
+
+### From the NanoHIV-DR directory:
+
+'''
+docker buildx build \
+--platform linux/amd64 \
+-t nanohiv-dr-cpu:latest \
+--load .
+'''
+### Confirm the image exists:
+
+'docker images | grep nanohiv'
+
+### Expected output:
+
+'nanohiv-dr-cpu    latest'
+
+## 1. Nanopore POD5 data
+
+data/pod5/
+
+## 2. Patient metadata table
+
+The user must provide a TSV file containing patient/sample information.
+
+### Example:
+
+my_patient_table.tsv
+
+### Example format:
+
+The metadata file is supplied every time the pipeline is run.
+
+# Running NanoHIV-DR
+
+### Basic Command
+
+'''
+nextflow run main.nf \
+--pod5 data/pod5 \
+--metadata my_patient_table.tsv
+'''
+
+# Resume interrupted runs
+
+Nextflow automatically caches completed steps.
+
+If a run stops:
+
+'''
+nextflow run main.nf -resume \
+--pod5 data/pod5 \
+--metadata metadata.tsv
+'''
+
+Only incomplete steps will restart.
+
+# CPU configuration
+
+### The default configuration uses:
+
+threads = 8
+
+### Change this in:
+
+nextflow.config
+
+### or at runtime:
+
+'''
+nextflow run main.nf \
+--threads 16 \
+--pod5 data/pod5 \
+--metadata metadata.tsv
+'''
+
+# Troubleshooting
+
+## Docker platform warning on Apple Silicon
+
+If using an ARM64 Mac (M1/M2/M3/M4):
+You may see: requested image platform linux/amd64 does not match host platform
+
+This is expected because the container uses the x86_64 Dorado binary.
+
+The pipeline runs using Docker emulation.
+
+# Citation
+
+If you use NanoHIV-DR in research, please cite:
+
+# Contact
+For issues, feature requests or bug reports:
+
+
+
 
 
 
