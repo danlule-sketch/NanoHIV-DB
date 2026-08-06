@@ -192,7 +192,7 @@ if __name__ == "__main__":
             ht0=htab_cells[1].add_paragraph('')
             ht0.alignment = WD_ALIGN_PARAGRAPH.CENTER
             kh=ht0.add_run()
-            kh.add_picture('UVRIlogo_best.png', width=Inches(4))
+            kh.add_picture('UVRIlogo.png', width=Inches(4))
             ht1=htab_cells[2].add_paragraph(sample)
             ht1.alignment = WD_ALIGN_PARAGRAPH.RIGHT
            
