@@ -62,11 +62,19 @@ else:
         out.write(customQuery)
     print ("Custom query file:\t" + query_file+"\n")    
 
-
 # call sierrapy and run on input data
 print ("Performing sierrapy query...\n")
-sierrapy_command = "sierrapy fasta " + inputFasta + " -q " + query_file
-with open (output_json, "w+") as out:
-    subprocess.run(sierrapy_command, shell=True, check=True, stdout = out)
 
+sierrapy_command = [
+    "sierrapy",
+    "fasta",
+    inputFasta,
+    "-q",
+    query_file,
+    "-o",
+    output_json,
+    "--no-sharding"
+]
+
+subprocess.run(sierrapy_command, check=True)
 
