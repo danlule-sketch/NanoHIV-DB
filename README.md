@@ -19,45 +19,7 @@ NanoHIV-DR is a Nextflow-based pipeline designed to analyse Oxford Nanopore HIV 
 The pipeline is containerised using Docker to ensure reproducibility.
 
 ##Worfkflow Overview
-Input:
- ├── Nanopore POD5 files
- └── Patient metadata table (TSV)
-        |
-        v
-Dorado basecalling
-        |
-        v
-Demultiplexing
-        |
-        v
-Human read removal
-        |
-        v
-NanoQ quality filtering
-        |
-        v
-Canu assembly
-        |
-        v
-Medaka polishing
-        |
-        v
-Minimap2 read mapping
-        |
-        +----------------+
-        |                |
-        v                v
- CodFreq analysis     HIVdb resistance scoring
-        |
-        v
-Automated report generation
-        |
-        v
-Subtype query
-MAFFT alignment
-RAxML phylogeny
-Phylogenetic visualisation
-DOCX report
+<img width="481" height="640" alt="Screenshot 2026-08-06 at 16 29 06" src="https://github.com/user-attachments/assets/3755ccff-cd1f-4721-a28c-8b777f009516" />
 
 #Requirements
 The following software must be installed:
