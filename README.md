@@ -43,8 +43,7 @@ Check installation
 
 ### Move into the pipeline directory:
 'cd NanoHIV-DR'
-
-<img width="270" height="634" alt="Screenshot 2026-08-06 at 17 15 46" src="https://github.com/user-attachments/assets/d5fec8d2-4542-41b5-a0b7-ee3a53279711" />
+<img width="306" height="729" alt="Screenshot 2026-08-06 at 17 26 18" src="https://github.com/user-attachments/assets/5642400c-4fda-46ce-8140-ade10dcaccbc" />
 
 
 
