@@ -7,19 +7,16 @@ NanoHIV-DB is a Nextflow pipeline for the analysis of HIV-1 drug resistance for 
 NanoHIV-DR is a Nextflow-based pipeline designed to analyse Oxford Nanopore HIV sequencing data. The workflow carries out the following key steps:
 1.	Nanopore basecalling using Dorado
 2.	Barcode demultiplexing using Dorado
-3.	Removal of human host reads using RemoveHost
-4.	Read quality filtering using NanoQ
-5.	De novo HIV genome assembly using CANU
-6.	Consensus polishing using Medaka
-7.	Read mapping back to the polished HIV genome using Minimap2
-8.	HIV drug resistance analysis using SierraPy, a standalone installation
-9.	Codon frequency analysis using SierraPy built-in algorithm 
-10.	Automated HIV subtype query, phylogenetic analysis and reporting
-11.	
-The pipeline is containerised using Docker to ensure reproducibility.
+3.	Read quality filtering using NanoQ
+4.	Consensus polishing using Medaka
+5.	Read mapping back to the polished HIV genome using Minimap2
+6.	HIV drug resistance analysis using SierraPy, a standalone installation
+7.	Codon frequency analysis using SierraPy built-in algorithm 
+8.	Automated HIV subtype query, phylogenetic analysis, and reporting 
+9.	The pipeline is containerised using Docker to ensure reproducibility.
 
 ## Worfkflow Overview
-<img width="328" height="828" alt="Screenshot 2026-08-06 at 17 06 05" src="https://github.com/user-attachments/assets/e1098c2b-b3f7-4dc7-8710-b3983b25a418" />
+<img width="502" height="691" alt="Screenshot 2026-08-12 at 20 36 16" src="https://github.com/user-attachments/assets/a5a2d61f-e6e4-4eb6-9727-bd359e7463db" />
 
 # Requirements
 The following software must be installed:
