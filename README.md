@@ -150,9 +150,14 @@ The pipeline runs using Docker emulation.
 If you use NanoHIV-DR in research, please cite:
 
 # Contact
-For issues, feature requests or bug reports:
 
+For questions, bug reports, feature requests, or other issues related to NanoHIV-DR, please use the [GitHub Issues](https://github.com/danlule-sketch/NanoHIV-DB/issues/new/choose) page. For issues, feature requests or bug reports:
 
+Before opening a new issue, please check the existing issues to see whether your question or problem has already been reported.
+
+- 🐛 [Report a bug](https://github.com/danlule-sketch/NanoHIV-DB/issues/new?template=bug_report.md)
+- 💡 [Request a feature or data improvement](https://github.com/danlule-sketch/NanoHIV-DB/issues/new?template=feature_request.md)
+- 🔎 [View existing issues](https://github.com/danlule-sketch/NanoHIV-DB/issues)
 
 
 
