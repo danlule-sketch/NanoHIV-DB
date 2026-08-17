@@ -147,7 +147,7 @@ The pipeline runs using Docker emulation.
 
 # Citation
 
-If you use NanoHIV-DR in research, please cite:
+If you use NanoHIV-DR in research, please cite: Daniel Lule Bugembe, Deogratius Ssemwanga, Pontiano Kaleebu & Damien C. Tully. NanoHIV-DR: An end-to-end workflow for the detection of HIV-1 drug resistance of pol-gene Oxford Nanopore sequences. (Draft paper 2026)
 
 # Contact
 
