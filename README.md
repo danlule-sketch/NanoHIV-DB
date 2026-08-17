@@ -62,17 +62,21 @@ The images logoUVRI.png and logoCVR can be replaced with your institutional imag
 ### From the NanoHIV-DR directory:
 
 '''
+
 docker buildx build \
   --platform linux/amd64 \
   -t nanohiv-dr-cpu:latest \
   --load .
+
 '''
 
 You can verify the image platform:
 
 '''
+
 docker image inspect nanohiv-dr-cpu:latest \
   --format '{{.Os}}/{{.Architecture}}'
+  
 '''
 
 ### Confirm the image exists:
