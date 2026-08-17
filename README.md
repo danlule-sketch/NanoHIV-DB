@@ -152,6 +152,12 @@ nextflow run main.nf \
 
 '''
 
+## Note:
+
+The metadata table should be formatted as shown below.
+
+
+
 # Troubleshooting
 
 ## Docker platform warning on Apple Silicon
