@@ -108,9 +108,11 @@ The metadata file is supplied every time the pipeline is run.
 ### Basic Command
 
 '''
+
 nextflow run main.nf \
 --pod5 data/pod5 \
 --metadata my_patient_table.tsv
+
 '''
 
 # Resume interrupted runs
@@ -120,9 +122,11 @@ Nextflow automatically caches completed steps.
 If a run stops:
 
 '''
+
 nextflow run main.nf -resume \
 --pod5 data/pod5 \
 --metadata metadata.tsv
+
 '''
 
 Only incomplete steps will restart.
@@ -140,10 +144,12 @@ nextflow.config
 ### or at runtime:
 
 '''
+
 nextflow run main.nf \
 --threads 16 \
 --pod5 data/pod5 \
 --metadata metadata.tsv
+
 '''
 
 # Troubleshooting
