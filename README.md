@@ -156,7 +156,9 @@ nextflow run main.nf \
 
 The metadata table, "metadata.tsv" should be formatted so that the second column, named "Our/Alternative ID" has exactly the same identifiers with the fasta sequence headers, as the JSON output is matched with this to generate the clinical reports. The format of the data table is shown below.
 
-Precaution should be taken to observe confidentiality
+### CAUTION!
+
+Care should be taken to maintain confidentiality, as clinical reports may contain multiple pieces of information that, when combined, could potentially identify an individual.
 
 <img width="1764" height="276" alt="Screenshot 2026-08-17 at 13 49 14" src="https://github.com/user-attachments/assets/024096f0-10c2-43b6-a5b2-0e3e171c8068" />
 
