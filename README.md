@@ -177,7 +177,7 @@ WARNING: The requested image's platform (linux/amd64) does not match the detecte
 
 # Acknowledgement
 
-We appreciate the contribution of Samantha Campbell whose workflow available at https://github.com/centre-for-virus-research/UVRI-HIV-diagnostic-report, used with minor modifications for implementing the clinical report generation section. The pipeline was developed through a collaboration with the Medical Research Council (MRC) Centre for Virus Research (CVR), Glasgow, to suit the needs of the Uganda Virus Research Institute(UVRI). 
+We appreciate the contribution of Samantha Campbell whose workflow available at https://github.com/centre-for-virus-research/UVRI-HIV-diagnostic-report, was used with minor modifications for implementing the clinical report generation section. The pipeline was developed through a collaboration with the Medical Research Council (MRC) Centre for Virus Research (CVR), Glasgow, to suit the needs of the Uganda Virus Research Institute(UVRI). 
 
 # Citation
 
