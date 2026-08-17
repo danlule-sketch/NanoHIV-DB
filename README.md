@@ -63,10 +63,18 @@ The images logoUVRI.png and logoCVR can be replaced with your institutional imag
 
 '''
 docker buildx build \
---platform linux/amd64 \
--t nanohiv-dr-cpu:latest \
---load .
+  --platform linux/amd64 \
+  -t nanohiv-dr-cpu:latest \
+  --load .
 '''
+
+You can verify the image platform:
+
+'''
+docker image inspect nanohiv-dr-cpu:latest \
+  --format '{{.Os}}/{{.Architecture}}'
+'''
+
 ### Confirm the image exists:
 
 'docker images | grep nanohiv'
@@ -138,12 +146,11 @@ nextflow run main.nf \
 
 ## Docker platform warning on Apple Silicon
 
-If using an ARM64 Mac (M1/M2/M3/M4):
-You may see: requested image platform linux/amd64 does not match host platform
+NanoHIV-DR currently uses an x86_64 (`linux/amd64`) Dorado binary. Therefore, the Docker image is built for the `linux/amd64` platform.
 
-This is expected because the container uses the x86_64 Dorado binary.
+If you are running NanoHIV-DR on an Apple Silicon Mac (M1/M2/M3/M4), your host system uses the ARM64 architecture. Docker may therefore display a warning such as:
 
-The pipeline runs using Docker emulation.
+WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8)
 
 # Citation
 
