@@ -175,6 +175,10 @@ If you are running NanoHIV-DR on an Apple Silicon Mac (M1/M2/M3/M4), your host s
 
 WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8)
 
+# Acknowledgement
+
+We appreciate the contribution of Samantha Campbell whose workflow available at https://github.com/centre-for-virus-research/UVRI-HIV-diagnostic-report, used with minor modifications for implementing the clinical report generation section. The pipeline was developed through a collaboration with the Medical Research Council (MRC) Centre for Virus Research (CVR), Glasgow, to suit the needs of the Uganda Virus Research Institute(UVRI). 
+
 # Citation
 
 If you use NanoHIV-DR in research, please cite: Daniel Lule Bugembe, Deogratius Ssemwanga, Pontiano Kaleebu & Damien C. Tully. NanoHIV-DR: An end-to-end workflow for the detection of HIV-1 drug resistance of pol-gene Oxford Nanopore sequences. (Draft paper 2026)
