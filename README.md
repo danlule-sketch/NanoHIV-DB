@@ -46,15 +46,14 @@ Check installation
 
 The file structure is demonstrated below:
 
-<img width="354" height="354" alt="Screenshot 2026-08-17 at 12 12 51" src="https://github.com/user-attachments/assets/ee7ab4a0-6aeb-401e-b0b0-c16d080e1ae7" />
+<img width="347" height="639" alt="Screenshot 2026-09-10 at 15 26 46" src="https://github.com/user-attachments/assets/2d46c173-cfec-4f6c-bbfd-a298f2ade4ff" />
 
 The architecture of the "main.nf" file that connects the workflow is shown below:
 
-<img width="326" height="255" alt="Screenshot 2026-08-17 at 12 15 39" src="https://github.com/user-attachments/assets/97cef75b-2837-42aa-99a1-3b7a23ebc715" />
+<img width="400" height="787" alt="Screenshot 2026-09-10 at 15 39 38" src="https://github.com/user-attachments/assets/ecc6399f-a458-4b73-82a4-db34cfd737e7" />
+<img width="369" height="590" alt="Screenshot 2026-09-10 at 15 40 16" src="https://github.com/user-attachments/assets/ec88a553-be05-4837-aca5-5e7cb010d055" />
 
-The Dockerfile download will contain a file structure as shown below:
 
-<img width="186" height="208" alt="Screenshot 2026-08-17 at 12 22 05" src="https://github.com/user-attachments/assets/e8cd994a-b99c-437b-af1c-ac1a45510057" />
 
 ### Note: 
 The images logoUVRI.png and logoCVR can be replaced with your institutional images to customise your reporting.
