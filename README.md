@@ -46,17 +46,12 @@ Check installation
 
 The file structure is demonstrated below:
 
-<img width="347" height="639" alt="Screenshot 2026-09-10 at 15 26 46" src="https://github.com/user-attachments/assets/2d46c173-cfec-4f6c-bbfd-a298f2ade4ff" />
-
-
+<img width="347" height="639" alt="Screenshot 2026-09-10 at 15 26 46" src="https://github.com/user-attachments/assets/2d46c173-cfec-4f6c-bbfd-a298f2ade4ff" /> <br><br> 
 
 The architecture of the "main.nf" file that connects the workflow is shown below:
 
+<img width="231" height="802" alt="Screenshot 2026-09-10 at 15 49 00" src="https://github.com/user-attachments/assets/99ea8a12-3eb2-4b66-86ca-edd139386021" />
 
-
-<img width="400" height="787" alt="Screenshot 2026-09-10 at 15 39 38" src="https://github.com/user-attachments/assets/ecc6399f-a458-4b73-82a4-db34cfd737e7" /> <br>
-
-<img width="369" height="590" alt="Screenshot 2026-09-10 at 15 40 16" src="https://github.com/user-attachments/assets/ec88a553-be05-4837-aca5-5e7cb010d055" />
 
 ### Note: 
 The images logoUVRI.png and logoCVR can be replaced with your institutional images to customise your reporting.
