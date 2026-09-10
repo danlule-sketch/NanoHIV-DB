@@ -48,6 +48,8 @@ The file structure is demonstrated below:
 
 <img width="347" height="639" alt="Screenshot 2026-09-10 at 15 26 46" src="https://github.com/user-attachments/assets/2d46c173-cfec-4f6c-bbfd-a298f2ade4ff" />
 
+
+
 The architecture of the "main.nf" file that connects the workflow is shown below:
 
 
