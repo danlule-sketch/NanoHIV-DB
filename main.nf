@@ -78,7 +78,7 @@ workflow {
             tuple(index, reads)
         }
 
-    bam = MINIMAP2(minimap_inputs)
+    alignment = MINIMAP2(minimap_inputs)
 
 
     /*
@@ -86,10 +86,18 @@ workflow {
      * 7. Medaka consensus polishing
      * ---------------------------------------------------------
      *
-     * MEDAKA expects one tuple:
-     *     (BAM, HXB2-pol reference)
+     * MINIMAP2 produces:
+     *     BAM
+     *     BAM index
+     *
+     * Extract the BAM and combine it with the
+     * HXB2-pol reference FASTA.
      *
      */
+    bam = alignment.map { bam_file, bai_file ->
+        bam_file
+    }
+
     medaka_inputs = bam
         .combine(hiv_reference)
         .map { bam_file, reference ->
