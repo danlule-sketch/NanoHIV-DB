@@ -85,11 +85,18 @@ workflow {
      * ---------------------------------------------------------
      * 7. Medaka consensus polishing
      * ---------------------------------------------------------
+     *
+     * MEDAKA expects one tuple:
+     *     (BAM, HXB2-pol reference)
+     *
      */
-    polished = MEDAKA(
-        bam,
-        hiv_reference
-    )
+    medaka_inputs = bam
+        .combine(hiv_reference)
+        .map { bam_file, reference ->
+            tuple(bam_file, reference)
+        }
+
+    polished = MEDAKA(medaka_inputs)
 
 
     /*
