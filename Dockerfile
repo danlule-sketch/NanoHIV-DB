@@ -34,6 +34,13 @@ RUN micromamba install -y -n base \
         bcftools \
     && micromamba clean --all --yes
 
+# Create SanitizeMe environment
+RUN micromamba create -y -n SanitizeMe \
+        -c conda-forge \
+        -c bioconda \
+        sanitizeme \
+    && micromamba clean --all --yes
+
 # Copy Dorado
 COPY containers/dorado-linux-x64 /opt/dorado
 
