@@ -1,4 +1,4 @@
-process REMOVEHOST {
+process SANITIZEME {
 
     tag "${reads.simpleName}"
 
