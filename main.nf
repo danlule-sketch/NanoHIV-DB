@@ -1,5 +1,6 @@
 include { DORADO_BASECALL } from './modules/dorado_basecall'
 include { DORADO_DEMUX }    from './modules/dorado_demux'
+include { SANITIZEME }      from './modules/sanitizeme'
 include { NANOQ }           from './modules/nanoq'
 include { MINIMAP2 }        from './modules/minimap2'
 include { MEDAKA }          from './modules/medaka'
@@ -27,13 +28,25 @@ workflow {
 
     /*
      * ---------------------------------------------------------
-     * 4. Quality filtering
+     * 3. Remove host DNA
      * ---------------------------------------------------------
      *
-     * Expected output:
+     * SanitizeMe removes reads mapping to host DNA.
      *
-     *     sample.fastq.gz
+     * Input:
+     *     demultiplexed FASTQ
      *
+     * Output:
+     *     host-depleted FASTQ
+     *
+     */
+    host_removed = SANITIZEME(demultiplexed)
+
+
+    /*
+     * ---------------------------------------------------------
+     * 4. Quality filtering
+     * ---------------------------------------------------------
      */
     filtered = NANOQ(host_removed)
 
@@ -42,13 +55,6 @@ workflow {
      * ---------------------------------------------------------
      * 5. HIV-1 pol reference
      * ---------------------------------------------------------
-     *
-     * HXB2-pol.fasta:
-     *     used by Medaka as the draft/reference sequence
-     *
-     * HXB2-pol.mmi:
-     *     pre-built minimap2 index used for mapping
-     *
      */
     hiv_reference = channel.fromPath(
         params.hiv_ref,
@@ -63,19 +69,8 @@ workflow {
 
     /*
      * ---------------------------------------------------------
-     * 6. Map filtered FASTQ to HXB2-pol
+     * 6. Map filtered reads to HIV-1 pol
      * ---------------------------------------------------------
-     *
-     * Input:
-     *
-     *     HXB2-pol.mmi
-     *     filtered FASTQ
-     *
-     * Output:
-     *
-     *     sample.bam
-     *     sample.bam.bai
-     *
      */
     minimap_inputs = filtered
         .combine(hiv_index)
@@ -90,17 +85,6 @@ workflow {
      * ---------------------------------------------------------
      * 7. Medaka consensus polishing
      * ---------------------------------------------------------
-     *
-     * Medaka receives:
-     *
-     *     sample.bam
-     *     sample.bam.bai
-     *     HXB2-pol.fasta
-     *
-     * and produces:
-     *
-     *     polished consensus FASTA
-     *
      */
     polished = MEDAKA(
         bam,
@@ -112,12 +96,6 @@ workflow {
      * ---------------------------------------------------------
      * 8. CodFreq analysis
      * ---------------------------------------------------------
-     *
-     * CodFreq operates directly on the filtered FASTQ.
-     *
-     * It uses its own minimap2-based alignment against
-     * the HIV reference/profile.
-     *
      */
     codfreq = CODFREQ(
         filtered
