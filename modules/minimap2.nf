@@ -10,8 +10,7 @@ process MINIMAP2 {
     tuple path(index), path(reads)
 
     output:
-    path "${reads.simpleName}.bam"
-    path "${reads.simpleName}.bam.bai"
+    tuple path("${reads.simpleName}.bam"), path("${reads.simpleName}.bam.bai"), emit: alignment
 
     script:
     """
