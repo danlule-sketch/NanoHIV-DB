@@ -14,19 +14,8 @@ process REMOVEHOST {
 
     script:
     """
-    minimap2 \
-        -ax map-ont \
-        -t ${task.cpus} \
-        ${params.human_index} \
-        ${reads} \
-        | samtools view -f 4 \
-        | cut -f1 \
-        | sort -u \
-        > ids.txt
-
-    seqtk subseq \
-        ${reads} \
-        ids.txt \
-        > ${reads.simpleName}_filtered.fastq
+    micromamba run -n SanitizeMe sanitizeme \
+        --input ${reads} \
+        --output ${reads.simpleName}_filtered.fastq
     """
 }
