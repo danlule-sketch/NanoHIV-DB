@@ -1,3 +1,4 @@
+<img width="484" height="699" alt="Screenshot 2026-09-13 at 13 37 41" src="https://github.com/user-attachments/assets/d2965799-0baf-4cef-a0b4-31ec2ca71609" />
 # NanoHIV-DB: Nanopore HIV Drug Resistance Analysis Pipeline.
 
 ## Introduction
