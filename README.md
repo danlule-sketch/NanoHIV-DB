@@ -59,35 +59,38 @@ The images logoUVRI.png and logoCVR can be replaced with your institutional imag
 
 ### From the NanoHIV-DR directory:
 
-'''
 
+```
 docker buildx build \
   --platform linux/amd64 \
   -t nanohiv-dr-cpu:latest \
   --load .
-
-'''
+```
 
 You can verify the image platform:
 
-'''
-
+```
 docker image inspect nanohiv-dr-cpu:latest \
   --format '{{.Os}}/{{.Architecture}}'
-  
-'''
+```
 
 ### Confirm the image exists:
 
+```
 'docker images | grep nanohiv'
+```
 
 ### Expected output:
 
+```
 'nanohiv-dr-cpu    latest'
+```
 
 ## 1. Nanopore POD5 data
 
+```
 data/pod5/
+```
 
 ## 2. Patient metadata table
 
@@ -95,7 +98,9 @@ The user must provide a TSV file containing patient/sample information.
 
 ### Example:
 
+```
 my_patient_table.tsv
+```
 
 ### Example format:
 
@@ -121,15 +126,16 @@ When Stage 1 completes, the pipeline creates a consensus FASTA and a metadata_te
 
 Stage 2 uses the consensus sequences and completed metadata to validate sample identifiers and generate the clinical report:
 
+```
 nextflow run main.nf \
     --stage report \
     --consensus results/consensus/consensus.fasta \
     --metadata metadata.tsv \
     --outdir results
+```
 
 The pipeline will stop during Stage 2 if the sample identifiers in the metadata do not exactly match those in the consensus FASTA.
 
-'''
 
 # Resume interrupted runs
 
@@ -137,13 +143,11 @@ Nextflow automatically caches completed steps.
 
 If a run stops:
 
-'''
-
+```
 nextflow run main.nf -resume \
 --pod5 data/pod5 \
 --metadata metadata.tsv
-
-'''
+```
 
 Only incomplete steps will restart.
 
@@ -158,15 +162,12 @@ threads = 8
 nextflow.config
 
 ### or at runtime:
-
-'''
-
+```
 nextflow run main.nf \
 --threads 16 \
 --pod5 data/pod5 \
 --metadata metadata.tsv
-
-'''
+```
 
 ### Note:
 
