@@ -105,11 +105,29 @@ The metadata file is supplied every time the pipeline is run.
 
 ### Basic Command
 
+
+# Running the Pipeline
+
 '''
 
+NanoHIV-DR is run in two stages. Stage 1 processes the raw Oxford Nanopore POD5 data through basecalling, demultiplexing, read filtering, alignment, polishing, and consensus generation. To run Stage 1, provide the directory containing the POD5 files:
+
 nextflow run main.nf \
---pod5 data/pod5 \
---metadata my_patient_table.tsv
+    --stage consensus \
+    --pod5 data/pod5 \
+    --outdir results
+
+When Stage 1 completes, the pipeline creates a consensus FASTA and a metadata_template.tsv file in results/consensus/. Complete the metadata template with the required sample information without changing the sample_id values, and save the completed file as metadata.tsv.
+
+Stage 2 uses the consensus sequences and completed metadata to validate sample identifiers and generate the clinical report:
+
+nextflow run main.nf \
+    --stage report \
+    --consensus results/consensus/consensus.fasta \
+    --metadata metadata.tsv \
+    --outdir results
+
+The pipeline will stop during Stage 2 if the sample identifiers in the metadata do not exactly match those in the consensus FASTA.
 
 '''
 
