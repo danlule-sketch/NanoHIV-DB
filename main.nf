@@ -51,7 +51,7 @@
  * Pipeline parameters
  * ============================================================
  *
- * These are defaults.
+ * These are default values.
  *
  * They can be overridden from the command line:
  *
@@ -60,6 +60,8 @@
  *     --consensus
  *     --metadata
  *     --outdir
+ *     --threads
+ *     --device
  *     etc.
  *
  * Configuration values in nextflow.config may also override
@@ -78,6 +80,15 @@ params.metadata = null
 params.outdir = 'results'
 
 params.threads = 8
+
+/*
+ * Dorado compute device.
+ *
+ * "auto" allows Dorado to choose the appropriate available
+ * hardware, such as Metal on Apple Silicon, CUDA on NVIDIA
+ * systems, or CPU where appropriate.
+ */
+params.device = 'auto'
 
 params.dorado_model = 'dna_r10.4.1_e8.2_400bps_sup@v5.2.0'
 
@@ -873,7 +884,12 @@ STAGE 1 PARAMETERS
 
     --stage consensus
 
+        Run the consensus-generation stage.
+
+
     --pod5 <POD5_DIRECTORY>
+
+        Directory containing Oxford Nanopore POD5 files.
 
 
 ============================================================
@@ -882,9 +898,17 @@ STAGE 2 PARAMETERS
 
     --stage report
 
+        Run the clinical reporting stage.
+
+
     --consensus <CONSENSUS_FASTA>
 
+        Consensus FASTA produced by Stage 1.
+
+
     --metadata <METADATA_TSV>
+
+        Completed metadata file.
 
 
 ============================================================
@@ -893,14 +917,33 @@ GENERAL PARAMETERS
 
     --outdir <DIRECTORY>
 
+        Output directory.
+
         Default:
             results
 
 
     --threads <INTEGER>
 
+        Number of threads used by modules that support
+        the parameter.
+
         Default:
             8
+
+
+    --device <DEVICE>
+
+        Dorado compute device.
+
+        Default:
+            auto
+
+        Examples:
+            auto
+            cpu
+            cuda:all
+            cuda:0
 
 
 ============================================================
@@ -992,12 +1035,29 @@ Stage 1:
         --outdir results
 
 
+Stage 1 using CPU:
+
+    nextflow run main.nf \\
+        --stage consensus \\
+        --pod5 data/pod5 \\
+        --outdir results \\
+        --device cpu
+
+
 Stage 2:
 
     nextflow run main.nf \\
         --stage report \\
         --consensus results/consensus/consensus.fasta \\
         --metadata metadata.tsv \\
+        --outdir results
+
+
+Resume an interrupted run:
+
+    nextflow run main.nf -resume \\
+        --stage consensus \\
+        --pod5 data/pod5 \\
         --outdir results
 
 
@@ -1208,7 +1268,6 @@ Example:
          * and:
          *
          *     CODFREQ
-         *
          * ----------------------------------------------------
          */
 
@@ -1275,59 +1334,6 @@ Example:
             consensus_files
         )
 
-
-        /*
-         * ----------------------------------------------------
-         * Stage 1 completion
-         * ----------------------------------------------------
-         */
-
-        log.info """
-
-============================================================
- CONSENSUS STAGE COMPLETE
-============================================================
-
-Consensus output:
-
-    ${params.outdir}/consensus/consensus.fasta
-
-Manifest:
-
-    ${params.outdir}/consensus/consensus_manifest.tsv
-
-Metadata template:
-
-    ${params.outdir}/consensus/metadata_template.tsv
-
-
-IMPORTANT:
-
-Complete:
-
-    ${params.outdir}/consensus/metadata_template.tsv
-
-
-DO NOT change the sample_id values.
-
-
-Save the completed file as:
-
-    metadata.tsv
-
-
-Then run:
-
-    nextflow run main.nf \\
-        --stage report \\
-        --consensus ${params.outdir}/consensus/consensus.fasta \\
-        --metadata metadata.tsv \\
-        --outdir ${params.outdir}
-
-
-============================================================
-
-"""
     }
 
 
@@ -1446,27 +1452,119 @@ Example:
             validated_metadata
         )
 
+    }
 
-        /*
-         * ----------------------------------------------------
-         * Stage 2 completion
-         * ----------------------------------------------------
-         */
 
-        log.info """
+    /*
+     * ========================================================
+     * WORKFLOW COMPLETION SUMMARY
+     * ========================================================
+     *
+     * This handler runs only after the complete workflow has
+     * finished, including all processes that were scheduled.
+     *
+     * It therefore provides the reliable runtime and success
+     * status for the Nextflow execution.
+     * ========================================================
+     */
 
-============================================================
- REPORT STAGE COMPLETE
-============================================================
+    workflow.onComplete = {
 
-Clinical reporting has completed.
+        def status = workflow.success
+            ? "SUCCESS"
+            : "FAILED"
 
-Output directory:
+        println ""
 
-    ${params.outdir}
+        println "============================================================"
+        println " NanoHIV-DR WORKFLOW COMPLETE"
+        println "============================================================"
+        println ""
 
-============================================================
+        println "Status:"
+        println ""
+        println "    ${status}"
 
-"""
+        println ""
+
+        println "Duration:"
+        println ""
+        println "    ${workflow.duration}"
+
+        println ""
+
+        println "Completed:"
+        println ""
+        println "    ${workflow.complete}"
+
+        println ""
+
+        println "Output directory:"
+        println ""
+        println "    ${params.outdir}"
+
+        println ""
+
+        if (workflow.success) {
+
+            if (params.stage == "consensus") {
+
+                println "Stage 1 outputs:"
+                println ""
+                println "    ${params.outdir}/consensus/consensus.fasta"
+                println "    ${params.outdir}/consensus/consensus_manifest.tsv"
+                println "    ${params.outdir}/consensus/metadata_template.tsv"
+
+                println ""
+
+                println "Human checkpoint:"
+                println ""
+                println "    Complete metadata_template.tsv"
+                println "    without changing the sample_id values."
+                println ""
+                println "    Save the completed file as:"
+                println ""
+                println "        metadata.tsv"
+
+                println ""
+
+                println "Then run Stage 2:"
+                println ""
+
+                println "    nextflow run main.nf \\\\"
+                println "        --stage report \\\\"
+                println "        --consensus ${params.outdir}/consensus/consensus.fasta \\\\"
+                println "        --metadata metadata.tsv \\\\"
+                println "        --outdir ${params.outdir}"
+
+            }
+            else if (params.stage == "report") {
+
+                println "Clinical reporting completed successfully."
+
+            }
+
+        }
+        else {
+
+            println "The workflow did not complete successfully."
+
+            println ""
+
+            if (workflow.errorMessage) {
+
+                println "Error:"
+                println ""
+                println "    ${workflow.errorMessage}"
+
+            }
+
+        }
+
+        println ""
+
+        println "============================================================"
+        println ""
+
     }
 }
