@@ -16,7 +16,7 @@ NanoHIV-DR is a Nextflow-based pipeline designed to analyse Oxford Nanopore HIV 
 9.	Automated HIV subtype query, phylogenetic analysis, and reporting 
 10.	The pipeline is containerised using Docker to ensure reproducibility.
 
-## Worfkflow Overview
+## Workflow Overview
 
 <img width="385" height="539" alt="Screenshot 2026-09-10 at 15 00 38" src="https://github.com/user-attachments/assets/47d769ec-96b1-46c6-9868-c6a12017522f" />
 
@@ -112,8 +112,6 @@ The metadata file is supplied every time the pipeline is run.
 
 
 # Running the Pipeline
-
-'''
 
 NanoHIV-DR is run in two stages. Stage 1 processes the raw Oxford Nanopore POD5 data through basecalling, demultiplexing, read filtering, alignment, polishing, and consensus generation. To run Stage 1, provide the directory containing the POD5 files:
 
