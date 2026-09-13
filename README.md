@@ -112,7 +112,8 @@ The metadata file is supplied every time the pipeline is run.
 
 NanoHIV-DR is run in two stages. Stage 1 processes the raw Oxford Nanopore POD5 data through basecalling, demultiplexing, read filtering, alignment, polishing, and consensus generation. To run Stage 1, provide the directory containing the POD5 files:
 
-```nextflow run main.nf \
+```
+nextflow run main.nf \
     --stage consensus \
     --pod5 data/pod5 \
     --outdir results
@@ -129,41 +130,69 @@ nextflow run main.nf \
     --outdir results
 ```
 
+### Note:
 The pipeline will stop during Stage 2 if the sample identifiers in the metadata do not exactly match those in the consensus FASTA.
 
+The metadata table, "metadata.tsv" should be formatted so that the second column, named "Our/Alternative ID" has exactly the same identifiers with the fasta sequence headers, as the JSON output is matched with this to generate the clinical reports. The format of the data table is shown below. 
+
+<img width="1764" height="276" alt="Screenshot 2026-08-17 at 13 49 14" src="https://github.com/user-attachments/assets/024096f0-10c2-43b6-a5b2-0e3e171c8068" />
 
 # Resume interrupted runs
 
-Nextflow automatically caches completed processes. If a run is interrupted, you can use ```-resume``` to continue from the point at which the pipeline stopped rather than repeating completed processes.
-Nextflow automatically caches completed steps.
+Nextflow automatically caches completed processes. If a run is interrupted, use the -resume option to continue the workflow without unnecessarily repeating processes that have already completed successfully.
 
+For an interrupted Stage 1 run:
 
+### For an interrupted Stage 1 run:
 
+```
+nextflow run main.nf \
+    --stage consensus \
+    --pod5 data/pod5 \
+    --outdir results \
+    -resume
+```
 
+### For an interrupted Stage 2 run:
 
+```
+nextflow run main.nf \
+    --stage report \
+    --consensus results/consensus/consensus.fasta \
+    --metadata metadata.tsv \
+    --outdir results \
+    -resume
+```
 
+Nextflow will reuse cached results where possible and rerun only processes that need to be completed.
 
 # CPU configuration
 
-### The default configuration uses:
+The pipeline defines a default of 8 threads:
 
-threads = 8
+``` threads = 8 ```
 
-### Change this in:
+This value can be overridden at runtime with ``` --threads ```, for example:
 
-nextflow.config
-
-### or at runtime:
 ```
 nextflow run main.nf \
---threads 16 \
---pod5 data/pod5 \
---metadata metadata.tsv
+    --stage consensus \
+    --pod5 data/pod5 \
+    --outdir results \
+    --threads 16
 ```
 
-### Note:
+The actual CPU allocation for individual processes is controlled by the process configuration in nextflow.config and/or the individual pipeline modules. Therefore, changing --threads only affects processes that are configured to use the params.threads value.
 
-The metadata table, "metadata.tsv" should be formatted so that the second column, named "Our/Alternative ID" has exactly the same identifiers with the fasta sequence headers, as the JSON output is matched with this to generate the clinical reports. The format of the data table is shown below.
+### Note:
+The placement of -resume isn't important; Nextflow recognises it as a command-line option. So this is also perfectly valid:
+
+```
+nextflow run main.nf -resume \
+    --stage consensus \
+    --pod5 data/pod5 \
+    --outdir results
+```
 
 ### CAUTION!
 
