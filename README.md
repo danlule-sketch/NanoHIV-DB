@@ -1,4 +1,3 @@
-<img width="484" height="699" alt="Screenshot 2026-09-13 at 13 37 41" src="https://github.com/user-attachments/assets/d2965799-0baf-4cef-a0b4-31ec2ca71609" />
 # NanoHIV-DB: Nanopore HIV Drug Resistance Analysis Pipeline.
 
 ## Introduction
@@ -19,7 +18,7 @@ NanoHIV-DR is a Nextflow-based pipeline designed to analyse Oxford Nanopore HIV 
 
 ## Workflow Overview
 
-<img width="385" height="539" alt="Screenshot 2026-09-10 at 15 00 38" src="https://github.com/user-attachments/assets/47d769ec-96b1-46c6-9868-c6a12017522f" />
+<img width="484" height="699" alt="Screenshot 2026-09-13 at 13 37 41" src="https://github.com/user-attachments/assets/d2965799-0baf-4cef-a0b4-31ec2ca71609" />
 
 # Requirements
 The following software must be installed:
