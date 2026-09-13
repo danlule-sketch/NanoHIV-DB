@@ -110,9 +110,6 @@ The metadata file is supplied every time the pipeline is run.
 
 ### Basic Command
 
-
-# Running the Pipeline
-
 NanoHIV-DR is run in two stages. Stage 1 processes the raw Oxford Nanopore POD5 data through basecalling, demultiplexing, read filtering, alignment, polishing, and consensus generation. To run Stage 1, provide the directory containing the POD5 files:
 
 ```nextflow run main.nf \
@@ -137,17 +134,14 @@ The pipeline will stop during Stage 2 if the sample identifiers in the metadata 
 
 # Resume interrupted runs
 
+Nextflow automatically caches completed processes. If a run is interrupted, you can use ```-resume``` to continue from the point at which the pipeline stopped rather than repeating completed processes.
 Nextflow automatically caches completed steps.
 
-If a run stops:
 
-```
-nextflow run main.nf -resume \
---pod5 data/pod5 \
---metadata metadata.tsv
-```
 
-Only incomplete steps will restart.
+
+
+
 
 # CPU configuration
 
