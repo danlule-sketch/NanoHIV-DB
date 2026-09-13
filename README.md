@@ -137,6 +137,12 @@ The metadata table, "metadata.tsv" should be formatted so that the second column
 
 <img width="1764" height="276" alt="Screenshot 2026-08-17 at 13 49 14" src="https://github.com/user-attachments/assets/024096f0-10c2-43b6-a5b2-0e3e171c8068" />
 
+
+### CAUTION!
+
+Care should be taken to maintain confidentiality, as clinical reports may contain multiple pieces of information that, when combined, could potentially identify an individual.
+
+
 # Resume interrupted runs
 
 Nextflow automatically caches completed processes. If a run is interrupted, use the -resume option to continue the workflow without unnecessarily repeating processes that have already completed successfully.
@@ -193,15 +199,6 @@ nextflow run main.nf -resume \
     --pod5 data/pod5 \
     --outdir results
 ```
-
-### CAUTION!
-
-Care should be taken to maintain confidentiality, as clinical reports may contain multiple pieces of information that, when combined, could potentially identify an individual.
-
-<img width="1764" height="276" alt="Screenshot 2026-08-17 at 13 49 14" src="https://github.com/user-attachments/assets/024096f0-10c2-43b6-a5b2-0e3e171c8068" />
-
-
-
 
 # Troubleshooting
 
