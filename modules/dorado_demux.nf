@@ -8,7 +8,7 @@ process DORADO_DEMUX {
     path bam
 
     output:
-    path "demultiplexed/*.fastq"
+    path "demultiplexed/**/*.fastq"
 
     script:
     """
