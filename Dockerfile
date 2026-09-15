@@ -182,8 +182,8 @@ RUN echo "============================================================" && \
     micromamba run -n base bcftools --version | head -n 1 && \
     echo "" && \
     echo "SanitizeMe:" && \
-    micromamba run -n base sanitizeme --help >/dev/null && \
-    echo "sanitizeme OK" && \
+    micromamba run -n base SanitizeMe_CLI.py -h >/dev/null && \
+    echo "SanitizeMe_CLI.py OK" && \
     echo "" && \
     echo "REPORT:" && \
     test -x /opt/REPORT/preprocessing.sh && \
