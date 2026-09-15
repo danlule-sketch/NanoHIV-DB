@@ -5,7 +5,7 @@
 # Target architecture:
 #   linux/amd64
 #
-# This image contains:
+# Includes:
 #   - Dorado
 #   - minimap2
 #   - samtools
@@ -16,8 +16,8 @@
 #   - RAxML
 #   - bcftools
 #   - SanitizeMe
-#   - CodFreq
 #   - Python
+#   - CodFreq
 #   - NanoHIV-DR reporting scripts
 # ============================================================
 
@@ -45,8 +45,12 @@ RUN apt-get update && \
         wget \
         curl \
         git \
+        gcc \
+        g++ \
+        make \
         python3 \
         python3-pip \
+        python3-dev \
         unzip \
         tar \
         gzip \
@@ -57,12 +61,6 @@ RUN apt-get update && \
         sed \
         gawk \
         findutils \
-        build-essential \
-        zlib1g-dev \
-        libbz2-dev \
-        liblzma-dev \
-        libncurses-dev \
-        libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # ============================================================
@@ -85,43 +83,7 @@ RUN micromamba install -y \
     && micromamba clean --all --yes
 
 # ============================================================
-# CodFreq
-# ============================================================
-#
-# CodFreq source:
-#
-#   https://github.com/hivdb/codfreq
-#
-# CodFreq provides sam2codfreq and related commands.
-# ============================================================
-
-RUN git clone --depth 1 \
-        https://github.com/hivdb/codfreq.git \
-        /opt/codfreq
-
-RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    python3 -m pip install --no-cache-dir \
-        cython==0.29.35 \
-        pysam==0.21.0 \
-        cutadapt==4.4 \
-        orjson==3.9.1 && \
-    python3 -m pip install --no-cache-dir \
-        -r /opt/codfreq/requirements.txt && \
-    python3 -m pip install --no-cache-dir \
-        --ignore-installed \
-        /opt/codfreq
-
-# ============================================================
 # Dorado
-# ============================================================
-#
-# The repository must contain:
-#
-#   containers/dorado-linux-x64/
-#
-# containing:
-#
-#   containers/dorado-linux-x64/bin/dorado
 # ============================================================
 
 COPY containers/dorado-linux-x64 /opt/dorado
@@ -129,14 +91,39 @@ COPY containers/dorado-linux-x64 /opt/dorado
 RUN chmod +x /opt/dorado/bin/dorado
 
 # ============================================================
+# CodFreq
+# ============================================================
+#
+# Install CodFreq directly from the official GitHub repository.
+#
+# CodFreq uses Cython extensions and therefore requires:
+#   - gcc
+#   - g++
+#   - make
+#   - python3-dev
+#
+# The repository's setup.py installs the required Python
+# dependencies and builds the Cython extensions.
+# ============================================================
+
+RUN git clone --depth 1 \
+        https://github.com/hivdb/codfreq.git \
+        /opt/codfreq && \
+    cd /opt/codfreq && \
+    python3 -m pip install --no-cache-dir --break-system-packages \
+        cython==0.29.35 \
+        && \
+    python3 -m pip install --no-cache-dir --break-system-packages \
+        -r requirements.txt \
+        && \
+    python3 -m pip install --no-cache-dir --break-system-packages \
+        .
+
+# ============================================================
 # NanoHIV-DR reporting software
 # ============================================================
 
 COPY REPORT /opt/REPORT
-
-# ============================================================
-# Make reporting scripts executable
-# ============================================================
 
 RUN chmod +x /opt/REPORT/preprocessing.sh && \
     if [ -d /opt/REPORT/bin ]; then \
@@ -191,9 +178,12 @@ RUN echo "============================================================" && \
     echo "SanitizeMe_CLI.py OK" && \
     echo "" && \
     echo "CodFreq:" && \
-    command -v sam2codfreq && \
-    sam2codfreq --help >/dev/null && \
-    echo "sam2codfreq OK" && \
+    command -v fastq2codfreq && \
+    fastq2codfreq --help >/dev/null && \
+    echo "fastq2codfreq OK" && \
+    echo "" && \
+    echo "CodFreq Python module:" && \
+    python3 -c "import codfreq; print(codfreq.__file__)" && \
     echo "" && \
     echo "REPORT:" && \
     test -x /opt/REPORT/preprocessing.sh && \
