@@ -1,4 +1,3 @@
-
 #!/usr/bin/env nextflow
 
 /*
@@ -1124,19 +1123,28 @@ Example:
             bam_reference
         )
 
-
-        /*
-         * 7. CodFreq
-         *
-         * BAM + BAI + HIV1.json
-         */
-
-        codfreq_results = CODFREQ(
-            bam,
-            bai,
-            codfreq_profile
-        )
-
+			
+		/*
+ 		* ----------------------------------------------------
+ 		* 7. CodFreq
+ 		* ----------------------------------------------------
+ 		*/	
+ 		
+ 		codfreq_input = alignment
+ 			.combine(codfreq_profile)
+ 			.map { bam_file, bai_file, profile ->
+ 			
+ 				tuple(
+ 					bam_file,
+ 					bai_file,
+ 					profile
+ 				)
+ 			}
+ 			
+ 		codfreq_results = CODFREQ(
+ 			codfreq_input
+ 		)
+						
 
         /*
          * 8. Collect Medaka consensus files.
