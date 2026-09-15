@@ -2,6 +2,8 @@ process CODFREQ {
 
     tag "${bam.simpleName}"
 
+    container 'hivdb/codfreq:latest'
+
     cpus params.threads
 
     publishDir "${params.outdir}/08_codfreq",
@@ -14,7 +16,7 @@ process CODFREQ {
 
     output:
 
-    path "*.codfreq",
+    path "*.codfreq.tsv",
         emit: codfreq_results
 
     script:
@@ -32,11 +34,7 @@ process CODFREQ {
     echo "Profile:       ${profile}"
     echo ""
 
-    if ! command -v sam2codfreq >/dev/null 2>&1; then
-        echo "ERROR: sam2codfreq is not installed in the container."
-        echo "Container: nanohiv-dr-cpu:latest"
-        exit 127
-    fi
+    command -v sam2codfreq
 
     sam2codfreq \
         "${bam}" \
@@ -46,10 +44,21 @@ process CODFREQ {
     echo "CodFreq completed."
     echo ""
 
-    if ! find . -maxdepth 1 -type f -name "*.codfreq" | grep -q .; then
-        echo "ERROR: No *.codfreq output was produced."
+    find . \
+        -maxdepth 1 \
+        -type f \
+        -printf '    %f\\n'
+
+    if ! find . \
+        -maxdepth 1 \
+        -type f \
+        -name "*.codfreq.tsv" \
+        | grep -q .; then
+
+        echo "ERROR: No *.codfreq.tsv output was produced."
         ls -lah
         exit 1
+
     fi
 
     echo ""
