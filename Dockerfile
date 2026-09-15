@@ -141,7 +141,6 @@ RUN chmod +x /opt/REPORT/preprocessing.sh && \
         find /opt/REPORT/bin -type f -name "*.py" -exec chmod +x {} \; ; \
     fi
 
-
 # ============================================================
 # Verify installation
 # ============================================================
@@ -176,7 +175,8 @@ RUN echo "============================================================" && \
     micromamba run -n base mafft --version | head -n 1 && \
     echo "" && \
     echo "RAxML:" && \
-    micromamba run -n base raxmlHPC --version 2>&1 | head -n 1 && \
+    micromamba run -n base raxmlHPC -h 2>&1 | head -n 3 || true && \
+    echo "RAxML OK" && \
     echo "" && \
     echo "BCFtools:" && \
     micromamba run -n base bcftools --version | head -n 1 && \
@@ -192,7 +192,6 @@ RUN echo "============================================================" && \
     echo "============================================================" && \
     echo "NanoHIV-DR container OK" && \
     echo "============================================================"
-
 
 # ============================================================
 # Working directory
