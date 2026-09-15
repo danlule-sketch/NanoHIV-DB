@@ -1,20 +1,74 @@
 process CODFREQ {
 
-    container "hivdb/codfreq:latest"
+    tag "${reads.simpleName}"
 
-    publishDir "${params.outdir}/08_codfreq", mode: 'copy'
+    cpus 8
+
+    container "hivdb/codfreq-runner:latest"
+
+    publishDir "${params.outdir}/08_codfreq",
+        mode: 'copy',
+        overwrite: true
 
     input:
-    tuple path(bam), path(reference)
+
+    path reads
+
+    path profile
 
     output:
-    path "*.codfreq"
+
+    path "*.codfreq.gz",
+        emit: codfreq
 
     script:
+
     """
-    generate_codfreq \
-        --bam ${bam} \
-        --ref ${reference} \
-        --out codfreq
+    set -euo pipefail
+
+    echo "============================================================"
+    echo " CodFreq"
+    echo "============================================================"
+    echo "Input:       ${reads}"
+    echo "Profile:     ${profile}"
+    echo "Threads:     ${task.cpus}"
+    echo ""
+
+    mkdir -p codfreq_input
+
+    cp ${reads} codfreq_input/
+
+    bin/align-all-local \
+        -r ${profile} \
+        -d codfreq_input \
+        -m
+
+    echo ""
+    echo "CodFreq analysis complete."
+    echo ""
+
+    find codfreq_input \
+        -maxdepth 1 \
+        -type f \
+        -name "*.codfreq.gz" \
+        -exec cp {} . \\;
+
+    if ! compgen -G "*.codfreq.gz" > /dev/null; then
+
+        echo ""
+        echo "ERROR: CodFreq did not produce a .codfreq.gz file."
+        echo ""
+        ls -lah codfreq_input
+        echo ""
+
+        exit 1
+
+    fi
+
+    echo "CodFreq output:"
+    ls -lh *.codfreq.gz
+
+    echo ""
+    echo "============================================================"
     """
 }
