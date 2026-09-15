@@ -1,21 +1,22 @@
 process SANITIZEME {
 
-    tag "${reads.simpleName}"
+	tag "${reads.simpleName}"
 
-    cpus 8
+	cpus 8
 
-    publishDir "${params.outdir}/03_removehost", mode: 'copy'
+	publishDir "${params.outdir}/03_removehost", mode: 'copy'
 
-    input:
-    path reads
+	input:
+	path reads
 
-    output:
-    path "${reads.simpleName}_filtered.fastq"
+	output:
+	path "${reads.simpleName}_filtered.fastq"
 
-    script:
-    """
-    micromamba run -n SanitizeMe sanitizeme \
-        --input ${reads} \
-        --output ${reads.simpleName}_filtered.fastq
-    """
+	script:
+	"""
+	sanitizeme \
+    	--input ${reads} \
+    	--output ${reads.simpleName}_filtered.fastq
+	"""
+
 }
