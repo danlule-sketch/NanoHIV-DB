@@ -116,8 +116,9 @@ NanoHIV-DR is run in two stages. Stage 1 processes the raw Oxford Nanopore POD5 
 nextflow run main.nf \
     --stage consensus \
     --pod5 data/pod5 \
-    --outdir results
-    --dorado_model "$PWD/dna_r10.4.1_e8.2_400bps_sup@v5.2.0"
+    --outdir results \
+    --dorado_model "$PWD/dna_r10.4.1_e8.2_400bps_sup@v5.2.0" \
+    --with-docker
 ```
 When Stage 1 completes, the pipeline creates a consensus FASTA and a metadata_template.tsv file in results/consensus/. Complete the metadata template with the required sample information without changing the sample_id values, and save the completed file as metadata.tsv.
 
