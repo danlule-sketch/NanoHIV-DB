@@ -10,9 +10,7 @@ process CODFREQ {
 
     input:
 
-    path bam
-    path bai
-    path profile
+    tuple path(bam), path(bai), path(profile)
 
     output:
 
@@ -24,77 +22,39 @@ process CODFREQ {
     """
     set -euo pipefail
 
-    echo ""
     echo "============================================================"
     echo " CODFREQ"
     echo "============================================================"
     echo ""
 
-    echo "Input BAM:"
-    echo "    ${bam}"
-
+    echo "Input BAM:     ${bam}"
+    echo "Input BAI:     ${bai}"
+    echo "Profile:       ${profile}"
     echo ""
 
-    echo "Input BAI:"
-    echo "    ${bai}"
-
-    echo ""
-
-    echo "Profile:"
-    echo "    ${profile}"
-
-    echo ""
-
-    echo "Running sam2codfreq..."
-
-    echo ""
-
-    command -v sam2codfreq || {
+    if ! command -v sam2codfreq >/dev/null 2>&1; then
         echo "ERROR: sam2codfreq is not installed in the container."
-        echo ""
         echo "Container: nanohiv-dr-cpu:latest"
         exit 127
-    }
+    fi
 
     sam2codfreq \
         "${bam}" \
         -r "${profile}"
 
     echo ""
-    echo "CodFreq command completed."
+    echo "CodFreq completed."
     echo ""
 
-    echo "Output files:"
-    echo ""
-
-    find . \
-        -maxdepth 1 \
-        -type f \
-        -printf '    %f\\n'
-
-    echo ""
-
-    if ! find . \
-        -maxdepth 1 \
-        -type f \
-        -name "*.codfreq" \
-        | grep -q .; then
-
-        echo "ERROR: No *.codfreq file was produced."
-
-        echo ""
-        echo "Directory contents:"
-
+    if ! find . -maxdepth 1 -type f -name "*.codfreq" | grep -q .; then
+        echo "ERROR: No *.codfreq output was produced."
         ls -lah
-
         exit 1
-
     fi
 
     echo ""
     echo "============================================================"
     echo " CODFREQ COMPLETE"
     echo "============================================================"
-    echo ""
     """
 }
