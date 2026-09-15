@@ -1,10 +1,6 @@
 process CODFREQ {
 
-    tag "${bam.simpleName}"
-
-    cpus 8
-
-    container "hivdb/codfreq-runner:latest"
+    tag "${sample_id}"
 
     publishDir "${params.outdir}/08_codfreq",
         mode: 'copy',
@@ -12,123 +8,42 @@ process CODFREQ {
 
     input:
 
-    path bam
-
+    tuple val(sample_id), path(reads)
     path profile
 
     output:
 
-    path "*.codfreq.gz",
-        emit: codfreq
+    tuple val(sample_id), path("*.codfreq"),
+        emit: codfreq_results
 
     script:
 
     """
     set -euo pipefail
 
-    echo "============================================================"
-    echo " CodFreq"
-    echo "============================================================"
-    echo "Input BAM:  ${bam}"
-    echo "Profile:    ${profile}"
-    echo "Threads:    ${task.cpus}"
-    echo ""
+    mkdir -p codfreq_work
 
-    # ----------------------------------------------------------
-    # Prepare CodFreq input directory
-    # ----------------------------------------------------------
+    cp ${reads} codfreq_work/
 
-    mkdir -p codfreq_input
+    cp ${profile} codfreq_work/HIV1.json
 
-    cp ${bam} codfreq_input/
+    fastq2codfreq \
+        codfreq_work \
+        --program minimap2 \
+        --profile codfreq_work/HIV1.json \
+        --workers ${task.cpus}
 
-
-    # ----------------------------------------------------------
-    # Run CodFreq
-    # ----------------------------------------------------------
-    #
-    # align-all-local expects:
-    #
-    #     -r <PROFILE_PATH>
-    #     -d <INPUT_DIRECTORY>
-    #
-    # The HIV-1 profile is supplied as HIV1.json.
-    #
-    # ----------------------------------------------------------
-
-    bin/align-all-local \
-        -r ${profile} \
-        -d codfreq_input
-
-
-    # ----------------------------------------------------------
-    # Locate CodFreq output
-    # ----------------------------------------------------------
-
-    echo ""
-    echo "Searching for CodFreq output..."
-    echo ""
-
-    CODFREQ_FILE=\$(find codfreq_input \
-        -maxdepth 2 \
+    find codfreq_work \
+        -maxdepth 1 \
         -type f \
-        -name "*.codfreq.gz" \
-        | head -n 1)
+        -name '*.codfreq' \
+        -exec cp {} . \\;
 
-
-    if [[ -z "\$CODFREQ_FILE" ]]; then
-
-        echo ""
-        echo "ERROR: CodFreq did not produce a .codfreq.gz file."
-        echo ""
-
-        echo "Contents of codfreq_input:"
-        find codfreq_input \
-            -maxdepth 3 \
-            -type f \
-            -print \
-            -exec ls -lh {} \\;
-
-        echo ""
-
+    if ! compgen -G '*.codfreq' > /dev/null; then
+        echo "ERROR: CodFreq did not produce a .codfreq file."
+        echo "Contents of codfreq_work:"
+        find codfreq_work -maxdepth 2 -type f -print
         exit 1
-
     fi
-
-
-    # ----------------------------------------------------------
-    # Copy result to process working directory
-    # ----------------------------------------------------------
-
-    cp "\$CODFREQ_FILE" .
-
-
-    # ----------------------------------------------------------
-    # Verify output
-    # ----------------------------------------------------------
-
-    if ! compgen -G "*.codfreq.gz" > /dev/null; then
-
-        echo ""
-        echo "ERROR: Failed to copy CodFreq output."
-        echo ""
-
-        exit 1
-
-    fi
-
-
-    echo ""
-    echo "============================================================"
-    echo " CodFreq analysis complete"
-    echo "============================================================"
-    echo ""
-
-    echo "Output:"
-    ls -lh *.codfreq.gz
-
-    echo ""
-
-    echo "============================================================"
     """
 }
