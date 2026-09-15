@@ -1,6 +1,8 @@
 process CODFREQ {
 
-    tag "${sample_id}"
+    tag "${reads.simpleName}"
+
+    cpus params.threads
 
     publishDir "${params.outdir}/08_codfreq",
         mode: 'copy',
@@ -8,42 +10,94 @@ process CODFREQ {
 
     input:
 
-    tuple val(sample_id), path(reads)
+    path reads
     path profile
 
     output:
 
-    tuple val(sample_id), path("*.codfreq"),
+    path "*.codfreq.tsv",
         emit: codfreq_results
+
+    path "*.bam",
+        emit: codfreq_bam,
+        optional: true
+
+    path "*.bam.bai",
+        emit: codfreq_bai,
+        optional: true
 
     script:
 
     """
     set -euo pipefail
 
-    mkdir -p codfreq_work
+    echo ""
+    echo "============================================================"
+    echo " CODFREQ"
+    echo "============================================================"
+    echo ""
 
-    cp ${reads} codfreq_work/
+    echo "Input FASTQ:"
+    echo "    ${reads}"
 
-    cp ${profile} codfreq_work/HIV1.json
+    echo ""
+
+    echo "Profile:"
+    echo "    ${profile}"
+
+    echo ""
+
+    cp "${profile}" HIV1.json
+
+    echo "Running:"
+    echo ""
+
+    echo "    fastq2codfreq . \\\\"
+    echo "        --program minimap2 \\\\"
+    echo "        --profile HIV1.json \\\\"
+    echo "        --workers ${task.cpus}"
+
+    echo ""
 
     fastq2codfreq \
-        codfreq_work \
+        . \
         --program minimap2 \
-        --profile codfreq_work/HIV1.json \
+        --profile HIV1.json \
         --workers ${task.cpus}
 
-    find codfreq_work \
+    echo ""
+    echo "CodFreq command completed."
+    echo ""
+
+    echo "Output files:"
+
+    find . \
         -maxdepth 1 \
         -type f \
-        -name '*.codfreq' \
-        -exec cp {} . \\;
+        -printf '    %f\\n'
 
-    if ! compgen -G '*.codfreq' > /dev/null; then
-        echo "ERROR: CodFreq did not produce a .codfreq file."
-        echo "Contents of codfreq_work:"
-        find codfreq_work -maxdepth 2 -type f -print
+    echo ""
+
+    if ! find . \
+        -maxdepth 1 \
+        -type f \
+        -name "*.codfreq.tsv" \
+        | grep -q .; then
+
+        echo "ERROR: No *.codfreq.tsv file was produced."
+
+        echo ""
+        echo "Directory contents:"
+
+        ls -lah
+
         exit 1
     fi
+
+    echo ""
+    echo "============================================================"
+    echo " CODFREQ COMPLETE"
+    echo "============================================================"
+    echo ""
     """
 }
