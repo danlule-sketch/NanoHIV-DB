@@ -1,46 +1,54 @@
 process NANOQ {
 
-tag "${reads.simpleName}"
+    tag "${reads.simpleName}"
 
-publishDir "${params.outdir}/04_filtered",
-    mode: 'copy',
-    overwrite: true
+    cpus 8
 
-input:
-path reads
+    publishDir "${params.outdir}/04_nanoq",
+        mode: 'copy'
 
-output:
-path "${reads.simpleName}.trimmed.fastq",
-    emit: filtered_reads
+    input:
 
-script:
-"""
-set -euo pipefail
+    path reads
 
-echo "============================================================"
-echo " NanoQ"
-echo "============================================================"
-echo "Input:       ${reads}"
-echo "Min quality: ${params.min_quality}"
-echo "Min length:  ${params.min_length}"
-echo "Max length:  ${params.max_length}"
-echo ""
+    output:
 
-nanoq \
-    ${reads} \
-    -q ${params.min_quality} \
-    -l ${params.min_length} \
-    -m ${params.max_length} \
-    > ${reads.simpleName}.trimmed.fastq
+    path "${reads.simpleName}.trimmed.fastq"
 
-if [[ ! -s ${reads.simpleName}.trimmed.fastq ]]; then
-    echo "ERROR: NanoQ produced an empty output file."
-    exit 1
-fi
+    script:
 
-echo ""
-echo "NanoQ filtering complete."
-echo "Output: ${reads.simpleName}.trimmed.fastq"
-"""
+    """
+    set -euo pipefail
 
+    echo "============================================================"
+    echo " NanoQ"
+    echo "============================================================"
+    echo "Input:       ${reads}"
+    echo "Min quality: ${params.min_quality}"
+    echo "Min length:  ${params.min_length}"
+    echo "Max length:  ${params.max_length}"
+    echo ""
+
+    nanoq \
+        --input ${reads} \
+        --min-qual ${params.min_quality} \
+        --min-len ${params.min_length} \
+        --max-len ${params.max_length} \
+        --output ${reads.simpleName}.trimmed.fastq
+
+    if [[ ! -s ${reads.simpleName}.trimmed.fastq ]]; then
+
+        echo ""
+        echo "ERROR: NanoQ produced an empty output file."
+        echo ""
+
+        exit 1
+
+    fi
+
+    echo ""
+    echo "NanoQ filtering complete."
+    echo "Output: ${reads.simpleName}.trimmed.fastq"
+    echo ""
+    """
 }
