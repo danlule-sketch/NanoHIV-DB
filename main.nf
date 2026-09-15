@@ -1,59 +1,72 @@
 #!/usr/bin/env nextflow
 
 /*
- * ============================================================
+ * ============================================================================
  * NanoHIV-DR
- * ============================================================
+ * ============================================================================
  *
- * Two-stage Oxford Nanopore HIV drug-resistance workflow.
+ * Two-stage Oxford Nanopore HIV drug-resistance analysis pipeline.
  *
- *
- * STAGE 1 — CONSENSUS
+ * ---------------------------------------------------------------------------
+ * STAGE 1 — CONSENSUS GENERATION
+ * ---------------------------------------------------------------------------
  *
  * POD5
- *   ↓
+ *   |
+ *   v
  * Dorado basecalling
- *   ↓
+ *   |
+ *   v
  * Dorado demultiplexing
- *   ↓
- * SanitizeMe
- *   ↓
- * NanoQ
- *   ↓
- * Minimap2
- *   ↓
- * ┌─────────────────────┬─────────────────────┐
- * ↓                     ↓
- * Medaka                CodFreq
- * ↓                     ↓
- * Consensus             Variant results
- * ↓
+ *   |
+ *   v
+ * SanitizeMe host-read removal
+ *   |
+ *   v
+ * NanoQ quality/length filtering
+ *   |
+ *   v
+ * Minimap2 alignment
+ *   |
+ *   +-----------------------+
+ *   |                       |
+ *   v                       v
+ * Medaka                  CodFreq
+ *   |                       |
+ *   v                       v
+ * Consensus FASTA        Codon-frequency results
+ *   |
+ *   v
  * Human checkpoint
  *
  *
- * STAGE 2 — REPORTING
+ * ---------------------------------------------------------------------------
+ * STAGE 2 — CLINICAL REPORTING
+ * ---------------------------------------------------------------------------
  *
- * consensus.fasta
- *       +
- * metadata.tsv
- *       ↓
+ * Consensus FASTA
+ *        +
+ * Clinical metadata
+ *        |
+ *        v
  * Metadata validation
- *       ↓
+ *        |
+ *        v
  * Clinical reporting
  *
- * ============================================================
+ * ============================================================================
  */
 
 
 /*
- * ============================================================
- * Pipeline parameters
- * ============================================================
+ * ============================================================================
+ * PARAMETERS
+ * ============================================================================
  */
 
 params.help = false
 
-params.stage = ''
+params.stage = null
 
 params.pod5 = null
 params.consensus = null
@@ -62,14 +75,13 @@ params.metadata = null
 params.outdir = 'results'
 
 params.threads = 8
-
 params.device = 'auto'
 
 
 /*
- * ============================================================
- * Dorado
- * ============================================================
+ * ============================================================================
+ * DORADO
+ * ============================================================================
  */
 
 params.dorado_model =
@@ -80,9 +92,9 @@ params.kit_name =
 
 
 /*
- * ============================================================
- * NanoQ
- * ============================================================
+ * ============================================================================
+ * NANOQ
+ * ============================================================================
  */
 
 params.min_quality = 15
@@ -91,24 +103,13 @@ params.max_length = 1200
 
 
 /*
- * ============================================================
- * Human reference
- * ============================================================
- *
- * Used by SanitizeMe for host-read removal.
- *
- * ============================================================
+ * ============================================================================
+ * REFERENCES
+ * ============================================================================
  */
 
 params.human_ref =
     "${baseDir}/references/Human/human_g1k_v37.fasta"
-
-
-/*
- * ============================================================
- * HIV reference
- * ============================================================
- */
 
 params.hiv_ref =
     "${baseDir}/references/HIV/HXB2-pol.fasta"
@@ -118,14 +119,9 @@ params.hiv_index =
 
 
 /*
- * ============================================================
- * CodFreq profile
- * ============================================================
- *
- * CodFreq uses the HIV-1 profile JSON supplied with the
- * hivdb/codfreq-runner container workflow.
- *
- * ============================================================
+ * ============================================================================
+ * CODFREQ
+ * ============================================================================
  */
 
 params.codfreq_profile =
@@ -133,9 +129,9 @@ params.codfreq_profile =
 
 
 /*
- * ============================================================
- * Medaka
- * ============================================================
+ * ============================================================================
+ * MEDAKA
+ * ============================================================================
  */
 
 params.medaka_model =
@@ -143,9 +139,9 @@ params.medaka_model =
 
 
 /*
- * ============================================================
- * Metadata
- * ============================================================
+ * ============================================================================
+ * METADATA
+ * ============================================================================
  */
 
 params.metadata_id_column =
@@ -153,9 +149,9 @@ params.metadata_id_column =
 
 
 /*
- * ============================================================
- * Modules
- * ============================================================
+ * ============================================================================
+ * MODULES
+ * ============================================================================
  */
 
 include {
@@ -192,9 +188,20 @@ include {
 
 
 /*
- * ============================================================
- * CHECKPOINT_CONSENSUS
- * ============================================================
+ * ============================================================================
+ * CONSENSUS CHECKPOINT
+ * ============================================================================
+ *
+ * Combines all Medaka consensus FASTA files into a single FASTA file.
+ *
+ * Also creates:
+ *
+ *   consensus_manifest.tsv
+ *   metadata_template.tsv
+ *
+ * The metadata template is completed manually before Stage 2.
+ *
+ * ============================================================================
  */
 
 process CHECKPOINT_CONSENSUS {
@@ -225,33 +232,40 @@ process CHECKPOINT_CONSENSUS {
     """
     set -euo pipefail
 
-    echo ""
+    echo
     echo "============================================================"
     echo " NanoHIV-DR CONSENSUS CHECKPOINT"
     echo "============================================================"
-    echo ""
-
-    echo "Collecting Medaka consensus sequences..."
-    echo ""
+    echo
 
     rm -f consensus.fasta
     touch consensus.fasta
 
-    for f in ${consensus_files}; do
+    echo "Collecting Medaka consensus sequences..."
+    echo
 
-        case "\$f" in
+
+    /*
+     * ------------------------------------------------------------------------
+     * Collect FASTA files
+     * ------------------------------------------------------------------------
+     */
+
+    for fasta in ${consensus_files}; do
+
+        case "\$fasta" in
 
             *.fa|*.fasta|*.fna)
 
-                echo "Adding: \$f"
+                echo "  Adding: \$fasta"
 
-                cat "\$f" >> consensus.fasta
+                cat "\$fasta" >> consensus.fasta
 
                 ;;
 
             *)
 
-                echo "Skipping non-FASTA file: \$f"
+                echo "  Skipping non-FASTA file: \$fasta"
 
                 ;;
 
@@ -260,18 +274,30 @@ process CHECKPOINT_CONSENSUS {
     done
 
 
+    /*
+     * ------------------------------------------------------------------------
+     * Confirm that consensus sequences were produced
+     * ------------------------------------------------------------------------
+     */
+
     if [[ ! -s consensus.fasta ]]; then
 
-        echo ""
+        echo
         echo "ERROR: No FASTA consensus sequences were found."
-        echo ""
+        echo
 
-        ls -lh
+        ls -lah
 
         exit 1
 
     fi
 
+
+    /*
+     * ------------------------------------------------------------------------
+     * Validate and normalise FASTA
+     * ------------------------------------------------------------------------
+     */
 
     python3 - <<'PY'
 
@@ -287,9 +313,9 @@ current_id = None
 sequence = []
 
 
-with input_file.open() as fh:
+with input_file.open(encoding="utf-8") as handle:
 
-    for line in fh:
+    for line in handle:
 
         line = line.strip()
 
@@ -308,7 +334,6 @@ with input_file.open() as fh:
                 )
 
             current_id = line[1:].split()[0]
-
             sequence = []
 
         else:
@@ -316,14 +341,14 @@ with input_file.open() as fh:
             sequence.append(line)
 
 
-    if current_id is not None:
+if current_id is not None:
 
-        records.append(
-            (
-                current_id,
-                "".join(sequence)
-            )
+    records.append(
+        (
+            current_id,
+            "".join(sequence)
         )
+    )
 
 
 if not records:
@@ -336,7 +361,7 @@ if not records:
 seen = set()
 
 
-with output_file.open("w") as out:
+with output_file.open("w", encoding="utf-8") as output:
 
     for sample_id, sequence in records:
 
@@ -363,17 +388,17 @@ with output_file.open("w") as out:
 
         seen.add(sample_id)
 
-        out.write(f">{sample_id}\n")
+        output.write(f">{sample_id}\\n")
 
-        for i in range(0, len(sequence), 80):
+        for start in range(0, len(sequence), 80):
 
-            out.write(
-                sequence[i:i + 80] + "\n"
+            output.write(
+                sequence[start:start + 80] + "\\n"
             )
 
 
 print(
-    f"Found {len(records)} unique consensus sequences."
+    f"Validated {len(records)} unique consensus sequence(s)."
 )
 
 PY
@@ -382,101 +407,115 @@ PY
     mv consensus.normalised.fasta consensus.fasta
 
 
-    echo -e "sample_id\\tconsensus_file" \
-        > consensus_manifest.tsv
+    /*
+     * ------------------------------------------------------------------------
+     * Generate consensus manifest
+     * ------------------------------------------------------------------------
+     */
 
+    printf "sample_id\\tconsensus_file\\n" \
+        > consensus_manifest.tsv
 
     awk '
         /^>/ {
-            id=substr($0,2)
+            id = substr(\$0, 2)
             print id "\\tconsensus.fasta"
         }
     ' consensus.fasta \
         >> consensus_manifest.tsv
 
 
-    echo -e "sample_id\\tpatient_id\\tage\\tsex\\tdate" \
-        > metadata_template.tsv
+    /*
+     * ------------------------------------------------------------------------
+     * Generate metadata template
+     * ------------------------------------------------------------------------
+     */
 
+    printf "sample_id\\tpatient_id\\tage\\tsex\\tdate\\n" \
+        > metadata_template.tsv
 
     awk '
         /^>/ {
-            id=substr($0,2)
+            id = substr(\$0, 2)
             print id "\\t\\t\\t\\t"
         }
     ' consensus.fasta \
         >> metadata_template.tsv
 
 
-    COUNT=\$(grep -c '^>' consensus.fasta)
+    CONSENSUS_COUNT=\$(grep -c '^>' consensus.fasta)
 
 
-    echo ""
+    /*
+     * ------------------------------------------------------------------------
+     * Completion message
+     * ------------------------------------------------------------------------
+     */
+
+    echo
     echo "============================================================"
     echo " CONSENSUS CHECKPOINT COMPLETE"
     echo "============================================================"
-    echo ""
+    echo
 
-    echo "Consensus sequences: \$COUNT"
-    echo ""
+    echo "Consensus sequences: \$CONSENSUS_COUNT"
+    echo
 
-    echo "Files created:"
-    echo ""
-    echo "    consensus.fasta"
-    echo "    consensus_manifest.tsv"
-    echo "    metadata_template.tsv"
-    echo ""
+    echo "Generated files:"
+    echo
+    echo "  consensus.fasta"
+    echo "  consensus_manifest.tsv"
+    echo "  metadata_template.tsv"
+    echo
 
     echo "============================================================"
     echo " HUMAN CHECKPOINT"
     echo "============================================================"
-    echo ""
+    echo
 
     echo "Complete:"
-    echo ""
-    echo "    metadata_template.tsv"
-    echo ""
+    echo
+    echo "  metadata_template.tsv"
+    echo
 
     echo "IMPORTANT:"
-    echo ""
-    echo "DO NOT change the sample_id values."
-    echo ""
+    echo
+    echo "  Do not modify the sample_id values."
+    echo
 
     echo "Save the completed metadata file as:"
-    echo ""
-    echo "    metadata.tsv"
-    echo ""
+    echo
+    echo "  metadata.tsv"
+    echo
 
     echo "Then run Stage 2:"
-    echo ""
+    echo
 
-    echo "nextflow run main.nf \\\\"
-    echo "    --stage report \\\\"
-    echo "    --consensus ${params.outdir}/consensus/consensus.fasta \\\\"
-    echo "    --metadata metadata.tsv \\\\"
-    echo "    --outdir ${params.outdir}"
+    echo "  nextflow run main.nf \\\\"
+    echo "      --stage report \\\\"
+    echo "      --consensus ${params.outdir}/consensus/consensus.fasta \\\\"
+    echo "      --metadata metadata.tsv \\\\"
+    echo "      --outdir ${params.outdir}"
 
-    echo ""
-
+    echo
     echo "============================================================"
     """
 }
 
 
 /*
- * ============================================================
- * VALIDATE_METADATA
- * ============================================================
+ * ============================================================================
+ * METADATA VALIDATION
+ * ============================================================================
  */
 
 process VALIDATE_METADATA {
 
-    tag 'validate-metadata'
+    tag 'metadata-validation'
 
     input:
 
     path consensus
-
     path metadata
 
     output:
@@ -494,27 +533,33 @@ process VALIDATE_METADATA {
 import csv
 
 
-CONSENSUS = "${consensus}"
-METADATA = "${metadata}"
-REQUIRED_COLUMN = "${params.metadata_id_column}"
+CONSENSUS_FILE = "${consensus}"
+METADATA_FILE = "${metadata}"
+ID_COLUMN = "${params.metadata_id_column}"
 
 
-print("")
+print()
 print("============================================================")
-print(" VALIDATING METADATA")
+print(" NanoHIV-DR METADATA VALIDATION")
 print("============================================================")
-print("")
+print()
 
+
+/*
+ * ------------------------------------------------------------------------
+ * Read consensus identifiers
+ * ------------------------------------------------------------------------
+ */
 
 consensus_ids = []
 
 
 with open(
-    CONSENSUS,
+    CONSENSUS_FILE,
     encoding="utf-8"
-) as fh:
+) as handle:
 
-    for line in fh:
+    for line in handle:
 
         line = line.strip()
 
@@ -542,21 +587,27 @@ with open(
 if not consensus_ids:
 
     raise SystemExit(
-        "ERROR: No consensus sequences found."
+        "ERROR: No consensus sequences were found."
     )
 
 
 consensus_set = set(consensus_ids)
 
 
+/*
+ * ------------------------------------------------------------------------
+ * Read metadata
+ * ------------------------------------------------------------------------
+ */
+
 with open(
-    METADATA,
+    METADATA_FILE,
     newline="",
     encoding="utf-8-sig"
-) as fh:
+) as handle:
 
     reader = csv.DictReader(
-        fh,
+        handle,
         delimiter="\\t"
     )
 
@@ -566,18 +617,21 @@ with open(
             "ERROR: Metadata file is empty."
         )
 
+
     reader.fieldnames = [
         field.strip()
         for field in reader.fieldnames
     ]
 
-    if REQUIRED_COLUMN not in reader.fieldnames:
+
+    if ID_COLUMN not in reader.fieldnames:
 
         raise SystemExit(
             "ERROR: Metadata file must contain the "
-            f"'{REQUIRED_COLUMN}' column.\\n"
+            f"'{ID_COLUMN}' column.\\n"
             f"Columns found: {reader.fieldnames}"
         )
+
 
     rows = list(reader)
 
@@ -589,6 +643,12 @@ if not rows:
     )
 
 
+/*
+ * ------------------------------------------------------------------------
+ * Validate metadata identifiers
+ * ------------------------------------------------------------------------
+ */
+
 metadata_ids = []
 seen = set()
 
@@ -596,26 +656,26 @@ seen = set()
 for row_number, row in enumerate(rows, start=2):
 
     sample_id = (
-        row.get(
-            REQUIRED_COLUMN,
-            ""
-        ).strip()
+        row.get(ID_COLUMN, "").strip()
     )
+
 
     if not sample_id:
 
         raise SystemExit(
-            f"ERROR: Empty {REQUIRED_COLUMN} "
+            f"ERROR: Empty {ID_COLUMN} "
             f"at metadata row {row_number}."
         )
+
 
     if sample_id in seen:
 
         raise SystemExit(
-            f"ERROR: Duplicate {REQUIRED_COLUMN} "
+            f"ERROR: Duplicate {ID_COLUMN} "
             f"'{sample_id}' at metadata row "
             f"{row_number}."
         )
+
 
     seen.add(sample_id)
 
@@ -624,6 +684,12 @@ for row_number, row in enumerate(rows, start=2):
 
 metadata_set = set(metadata_ids)
 
+
+/*
+ * ------------------------------------------------------------------------
+ * Compare identifiers
+ * ------------------------------------------------------------------------
+ */
 
 missing_metadata = sorted(
     consensus_set - metadata_set
@@ -636,11 +702,12 @@ extra_metadata = sorted(
 
 if missing_metadata or extra_metadata:
 
-    print("")
+    print()
     print("============================================================")
     print(" METADATA VALIDATION FAILED")
     print("============================================================")
-    print("")
+    print()
+
 
     if missing_metadata:
 
@@ -651,24 +718,27 @@ if missing_metadata or extra_metadata:
         for sample_id in missing_metadata:
 
             print(
-                f"    {sample_id}"
+                f"  {sample_id}"
             )
 
-        print("")
+        print()
+
 
     if extra_metadata:
 
         print(
-            "Metadata entries with no consensus sequence:"
+            "Metadata entries without a corresponding "
+            "consensus sequence:"
         )
 
         for sample_id in extra_metadata:
 
             print(
-                f"    {sample_id}"
+                f"  {sample_id}"
             )
 
-        print("")
+        print()
+
 
     print(
         f"Consensus sequences: {len(consensus_set)}"
@@ -678,7 +748,8 @@ if missing_metadata or extra_metadata:
         f"Metadata entries:    {len(metadata_set)}"
     )
 
-    print("")
+    print()
+
 
     raise SystemExit(
         "ERROR: Consensus and metadata identifiers "
@@ -686,8 +757,14 @@ if missing_metadata or extra_metadata:
     )
 
 
+/*
+ * ------------------------------------------------------------------------
+ * Write validated metadata
+ * ------------------------------------------------------------------------
+ */
+
 with open(
-    METADATA,
+    METADATA_FILE,
     encoding="utf-8-sig"
 ) as source:
 
@@ -703,11 +780,17 @@ with open(
     destination.write(contents)
 
 
-print("")
+/*
+ * ------------------------------------------------------------------------
+ * Validation summary
+ * ------------------------------------------------------------------------
+ */
+
+print()
 print("============================================================")
 print(" METADATA VALIDATION PASSED")
 print("============================================================")
-print("")
+print()
 
 print(
     f"Consensus sequences: {len(consensus_set)}"
@@ -717,20 +800,16 @@ print(
     f"Metadata entries:    {len(metadata_set)}"
 )
 
-print("")
+print()
 
 print(
-    "Every consensus sequence has exactly one "
-    "metadata row."
+    "Each consensus sequence has exactly one "
+    "corresponding metadata entry."
 )
 
-print("")
-
-print(
-    "Proceeding to clinical reporting."
-)
-
-print("")
+print()
+print("Proceeding to clinical reporting.")
+print()
 
 PY
     """
@@ -738,18 +817,18 @@ PY
 
 
 /*
- * ============================================================
+ * ============================================================================
  * WORKFLOW
- * ============================================================
+ * ============================================================================
  */
 
 workflow {
 
 
     /*
-     * ========================================================
+     * ========================================================================
      * HELP
-     * ========================================================
+     * ========================================================================
      */
 
     if (params.help) {
@@ -757,16 +836,20 @@ workflow {
         log.info """
 
 ============================================================
-                    NanoHIV-DR Pipeline
+                    NanoHIV-DR
 ============================================================
 
-Two-stage HIV drug-resistance workflow for Oxford Nanopore
-sequencing data.
+Two-stage Oxford Nanopore HIV drug-resistance pipeline.
 
 
 ============================================================
-STAGE 1 — CONSENSUS
+STAGE 1 — CONSENSUS GENERATION
 ============================================================
+
+Input:
+
+    POD5 directory
+
 
 Run:
 
@@ -776,26 +859,26 @@ Run:
         --outdir results
 
 
-CPU:
+Stage 1 outputs:
 
-    nextflow run main.nf \\
-        --stage consensus \\
-        --pod5 data/pod5 \\
-        --outdir results \\
-        --device cpu
-
-
-Produces:
+    results/01_basecalled/
+    results/02_demultiplexed/
+    results/03_removehost/
+    results/04_nanoq/
+    results/06_minimap2/
+    results/07_medaka/
+    results/08_codfreq/
 
     results/consensus/consensus.fasta
-
     results/consensus/consensus_manifest.tsv
-
     results/consensus/metadata_template.tsv
 
 
-Complete metadata_template.tsv without changing the
-sample_id values.
+Complete:
+
+    metadata_template.tsv
+
+Do not change the sample_id values.
 
 Save the completed file as:
 
@@ -803,7 +886,7 @@ Save the completed file as:
 
 
 ============================================================
-STAGE 2 — REPORTING
+STAGE 2 — CLINICAL REPORTING
 ============================================================
 
 Run:
@@ -819,7 +902,37 @@ Run:
 GENERAL PARAMETERS
 ============================================================
 
---outdir <DIRECTORY>
+--stage
+
+    Pipeline stage.
+
+    Required:
+        consensus
+        report
+
+
+--pod5
+
+    Input POD5 directory.
+
+    Required for Stage 1.
+
+
+--consensus
+
+    Consensus FASTA file.
+
+    Required for Stage 2.
+
+
+--metadata
+
+    Clinical metadata TSV file.
+
+    Required for Stage 2.
+
+
+--outdir
 
     Output directory.
 
@@ -827,110 +940,98 @@ GENERAL PARAMETERS
         results
 
 
---threads <INTEGER>
+--threads
 
-    Number of threads.
+    Number of computational threads.
 
     Default:
         8
 
 
---device <DEVICE>
+--device
 
     Dorado compute device.
+
+    Examples:
+        auto
+        cpu
+        metal:all
 
     Default:
         auto
 
 
 ============================================================
-DORADO
+DORADO PARAMETERS
 ============================================================
 
---dorado_model <MODEL>
+--dorado_model
 
     Default:
         dna_r10.4.1_e8.2_400bps_sup@v5.2.0
 
 
---kit_name <KIT>
+--kit_name
 
     Default:
         SQK-NBD114-96
 
 
 ============================================================
-NANOQ
+NANOQ PARAMETERS
 ============================================================
 
---min_quality <INTEGER>
+--min_quality
 
     Default:
         15
 
 
---min_length <INTEGER>
+--min_length
 
     Default:
         800
 
 
---max_length <INTEGER>
+--max_length
 
     Default:
         1200
 
 
 ============================================================
-HUMAN REFERENCE
+REFERENCE FILES
 ============================================================
 
---human_ref <FASTA>
+--human_ref
 
     Default:
         references/Human/human_g1k_v37.fasta
 
 
-Used by SanitizeMe for host-read removal.
-
-
-============================================================
-HIV REFERENCE
-============================================================
-
---hiv_ref <FASTA>
+--hiv_ref
 
     Default:
         references/HIV/HXB2-pol.fasta
 
 
---hiv_index <MMI>
+--hiv_index
 
     Default:
         references/HIV/HXB2-pol.mmi
 
 
-============================================================
-CODFREQ
-============================================================
-
---codfreq_profile <JSON>
-
-    HIV-1 CodFreq profile.
+--codfreq_profile
 
     Default:
         references/HIV/HIV1.json
-
-
-The profile is used by the CodFreq runner to generate
-codon-frequency results from the aligned BAM files.
 
 
 ============================================================
 MEDAKA
 ============================================================
 
---medaka_model <MODEL>
+--medaka_model
 
     Default:
         r1041_e82_400bps_sup_v5.2.0
@@ -940,7 +1041,10 @@ MEDAKA
 METADATA
 ============================================================
 
---metadata_id_column <COLUMN>
+--metadata_id_column
+
+    Column used to match metadata records with
+    consensus FASTA identifiers.
 
     Default:
         sample_id
@@ -950,14 +1054,24 @@ METADATA
 RESUME
 ============================================================
 
+Stage 1:
+
     nextflow run main.nf -resume \\
         --stage consensus \\
         --pod5 data/pod5 \\
         --outdir results
 
 
-============================================================
+Stage 2:
 
+    nextflow run main.nf -resume \\
+        --stage report \\
+        --consensus results/consensus/consensus.fasta \\
+        --metadata metadata.tsv \\
+        --outdir results
+
+
+============================================================
 """
 
         return
@@ -965,9 +1079,9 @@ RESUME
 
 
     /*
-     * ========================================================
+     * ========================================================================
      * Validate stage
-     * ========================================================
+     * ========================================================================
      */
 
     if (!(params.stage in ['consensus', 'report'])) {
@@ -976,13 +1090,14 @@ RESUME
 
 Invalid or missing pipeline stage.
 
-Use:
+Please specify:
 
     --stage consensus
 
 or:
 
     --stage report
+
 
 For help:
 
@@ -993,18 +1108,18 @@ For help:
 
 
     /*
-     * ========================================================
+     * ========================================================================
      * STAGE 1 — CONSENSUS
-     * ========================================================
+     * ========================================================================
      */
 
     if (params.stage == 'consensus') {
 
 
         /*
-         * ----------------------------------------------------
-         * Validate POD5 parameter
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * Validate POD5 input
+         * --------------------------------------------------------------------
          */
 
         if (!params.pod5) {
@@ -1014,6 +1129,7 @@ For help:
 Missing required parameter:
 
     --pod5 <POD5_DIRECTORY>
+
 
 Example:
 
@@ -1026,9 +1142,9 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
-         * POD5 input
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * Input POD5 directory
+         * --------------------------------------------------------------------
          */
 
         pod5_input = channel.fromPath(
@@ -1039,9 +1155,9 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
-         * Human reference
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * Reference channels
+         * --------------------------------------------------------------------
          */
 
         human_reference = channel.fromPath(
@@ -1051,12 +1167,6 @@ Example:
         )
 
 
-        /*
-         * ----------------------------------------------------
-         * HIV reference
-         * ----------------------------------------------------
-         */
-
         hiv_reference = channel.fromPath(
             params.hiv_ref,
             checkIfExists: true,
@@ -1064,24 +1174,12 @@ Example:
         )
 
 
-        /*
-         * ----------------------------------------------------
-         * HIV minimap2 index
-         * ----------------------------------------------------
-         */
-
         hiv_index = channel.fromPath(
             params.hiv_index,
             checkIfExists: true,
             type: 'file'
         )
 
-
-        /*
-         * ----------------------------------------------------
-         * CodFreq profile
-         * ----------------------------------------------------
-         */
 
         codfreq_profile = channel.fromPath(
             params.codfreq_profile,
@@ -1091,9 +1189,9 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
          * 1. Dorado basecalling
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
          */
 
         basecalled = DORADO_BASECALL(
@@ -1102,9 +1200,9 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
          * 2. Dorado demultiplexing
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
          */
 
         demultiplexed = DORADO_DEMUX(
@@ -1113,9 +1211,9 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
-         * 3. SanitizeMe
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * 3. Remove human reads with SanitizeMe
+         * --------------------------------------------------------------------
          */
 
         host_removed = SANITIZEME(
@@ -1125,9 +1223,9 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
-         * 4. NanoQ
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * 4. Filter reads with NanoQ
+         * --------------------------------------------------------------------
          */
 
         filtered = NANOQ(
@@ -1136,9 +1234,15 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
-         * 5. Minimap2
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * 5. Align reads to HIV reference with Minimap2
+         * --------------------------------------------------------------------
+         *
+         * MINIMAP2 expects:
+         *
+         *     tuple(index, reads)
+         *
+         * --------------------------------------------------------------------
          */
 
         minimap_inputs = filtered
@@ -1158,13 +1262,16 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
-         * Extract BAM from Minimap2 output.
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * Extract BAM from alignment output.
+         *
+         * MINIMAP2 emits:
+         *
+         *     tuple(BAM, BAI)
+         * --------------------------------------------------------------------
          */
 
         bam = alignment.map {
-
             bam_file,
             bai_file ->
 
@@ -1173,14 +1280,18 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
-         * Combine BAM with HIV reference.
+         * --------------------------------------------------------------------
+         * 6. Generate consensus with Medaka
+         * --------------------------------------------------------------------
          *
-         * Used by Medaka.
-         * ----------------------------------------------------
+         * MEDAKA expects:
+         *
+         *     tuple(BAM, reference)
+         *
+         * --------------------------------------------------------------------
          */
 
-        bam_reference = bam
+        medaka_input = bam
             .combine(hiv_reference)
             .map { bam_file, reference ->
 
@@ -1191,71 +1302,71 @@ Example:
             }
 
 
-        /*
-         * ----------------------------------------------------
-         * 6. Medaka
-         * ----------------------------------------------------
-         */
-
         polished = MEDAKA(
-            bam_reference
+            medaka_input
         )
 
 
         /*
-         * ----------------------------------------------------
-         * 7. CodFreq
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * 7. Run CodFreq
+         * --------------------------------------------------------------------
          *
-         * CODFREQ expects two process arguments:
+         * CODFREQ currently expects:
          *
-         *     BAM
-         *     HIV1.json profile
+         *     path reads
+         *     path profile
          *
-         * ----------------------------------------------------
+         * and internally runs:
+         *
+         *     fastq2codfreq .
+         *
+         * Therefore the BAM generated by Minimap2 is passed directly
+         * to the current CodFreq module.
+         *
+         * --------------------------------------------------------------------
          */
 
-        codfreq_results = CODFREQ(
+        CODFREQ(
             bam,
             codfreq_profile
         )
 
 
         /*
-         * ----------------------------------------------------
-         * 8. Collect Medaka consensus files
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * 8. Collect Medaka consensus sequences
+         * --------------------------------------------------------------------
          */
 
         consensus_files = polished.collect()
 
 
         /*
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
          * 9. Human checkpoint
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
          */
 
         CHECKPOINT_CONSENSUS(
             consensus_files
         )
-
     }
 
 
     /*
-     * ========================================================
-     * STAGE 2 — REPORT
-     * ========================================================
+     * ========================================================================
+     * STAGE 2 — REPORTING
+     * ========================================================================
      */
 
     if (params.stage == 'report') {
 
 
         /*
-         * ----------------------------------------------------
-         * Validate consensus parameter
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * Validate consensus input
+         * --------------------------------------------------------------------
          */
 
         if (!params.consensus) {
@@ -1266,6 +1377,7 @@ Missing required parameter:
 
     --consensus <CONSENSUS_FASTA>
 
+
 Example:
 
     nextflow run main.nf \\
@@ -1278,9 +1390,9 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
-         * Validate metadata parameter
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * Validate metadata input
+         * --------------------------------------------------------------------
          */
 
         if (!params.metadata) {
@@ -1291,6 +1403,7 @@ Missing required parameter:
 
     --metadata <METADATA_TSV>
 
+
 Example:
 
     nextflow run main.nf \\
@@ -1303,9 +1416,9 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
-         * Consensus FASTA
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * Create input channels
+         * --------------------------------------------------------------------
          */
 
         consensus_input = channel.fromPath(
@@ -1315,12 +1428,6 @@ Example:
         )
 
 
-        /*
-         * ----------------------------------------------------
-         * Metadata TSV
-         * ----------------------------------------------------
-         */
-
         metadata_input = channel.fromPath(
             params.metadata,
             checkIfExists: true,
@@ -1329,9 +1436,9 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
          * Validate metadata
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
          */
 
         validated_metadata = VALIDATE_METADATA(
@@ -1341,148 +1448,132 @@ Example:
 
 
         /*
-         * ----------------------------------------------------
-         * Clinical reporting
-         * ----------------------------------------------------
+         * --------------------------------------------------------------------
+         * Generate reports
+         * --------------------------------------------------------------------
          */
 
         REPORT(
             consensus_input,
             validated_metadata
         )
-
     }
+}
 
 
-    /*
-     * ========================================================
-     * COMPLETION SUMMARY
-     * ========================================================
-     */
+/*
+ * ============================================================================
+ * WORKFLOW COMPLETION SUMMARY
+ * ============================================================================
+ */
 
-    workflow.onComplete = {
+workflow.onComplete = {
 
-        def status = workflow.success
-            ? 'SUCCESS'
-            : 'FAILED'
-
-
-        println ""
-
-        println "============================================================"
-        println " NanoHIV-DR WORKFLOW COMPLETE"
-        println "============================================================"
-        println ""
-
-        println "Status:"
-        println ""
-
-        println "    ${status}"
-
-        println ""
-
-        println "Duration:"
-        println ""
-
-        println "    ${workflow.duration}"
-
-        println ""
-
-        println "Completed:"
-        println ""
-
-        println "    ${workflow.complete}"
-
-        println ""
-
-        println "Output directory:"
-        println ""
-
-        println "    ${params.outdir}"
-
-        println ""
+    def status = workflow.success
+        ? 'SUCCESS'
+        : 'FAILED'
 
 
-        if (workflow.success) {
+    println ""
+    println "============================================================"
+    println " NanoHIV-DR WORKFLOW SUMMARY"
+    println "============================================================"
+    println ""
+
+    println "Status:"
+    println "    ${status}"
+    println ""
+
+    println "Duration:"
+    println "    ${workflow.duration}"
+    println ""
+
+    println "Completed:"
+    println "    ${workflow.complete}"
+    println ""
+
+    println "Output directory:"
+    println "    ${params.outdir}"
+    println ""
 
 
-            if (params.stage == 'consensus') {
+    if (workflow.success) {
 
-                println "Stage 1 outputs:"
-                println ""
+        if (params.stage == 'consensus') {
 
-                println "    ${params.outdir}/consensus/consensus.fasta"
-
-                println "    ${params.outdir}/consensus/consensus_manifest.tsv"
-
-                println "    ${params.outdir}/consensus/metadata_template.tsv"
-
-                println ""
-
-                println "CodFreq results:"
-                println ""
-
-                println "    ${params.outdir}/08_codfreq/"
-
-                println ""
-
-                println "Human checkpoint:"
-                println ""
-
-                println "    Complete metadata_template.tsv"
-                println "    without changing sample_id values."
-
-                println ""
-
-                println "    Save the completed file as:"
-                println ""
-
-                println "        metadata.tsv"
-
-                println ""
-
-                println "Then run Stage 2:"
-                println ""
-
-                println "    nextflow run main.nf \\\\"
-                println "        --stage report \\\\"
-                println "        --consensus ${params.outdir}/consensus/consensus.fasta \\\\"
-                println "        --metadata metadata.tsv \\\\"
-                println "        --outdir ${params.outdir}"
-
-            }
-
-
-            if (params.stage == 'report') {
-
-                println "Clinical reporting completed successfully."
-
-            }
-
-        }
-        else {
-
-            println "The workflow did not complete successfully."
-
+            println "Stage 1 completed successfully."
             println ""
 
-            if (workflow.errorMessage) {
+            println "Consensus files:"
+            println ""
+            println "    ${params.outdir}/consensus/consensus.fasta"
+            println "    ${params.outdir}/consensus/consensus_manifest.tsv"
+            println "    ${params.outdir}/consensus/metadata_template.tsv"
+            println ""
 
-                println "Error:"
-                println ""
+            println "Analysis outputs:"
+            println ""
+            println "    ${params.outdir}/01_basecalled/"
+            println "    ${params.outdir}/02_demultiplexed/"
+            println "    ${params.outdir}/03_removehost/"
+            println "    ${params.outdir}/04_nanoq/"
+            println "    ${params.outdir}/06_minimap2/"
+            println "    ${params.outdir}/07_medaka/"
+            println "    ${params.outdir}/08_codfreq/"
+            println ""
 
-                println "    ${workflow.errorMessage}"
+            println "Human checkpoint:"
+            println ""
+            println "    Complete metadata_template.tsv"
+            println "    without changing sample_id values."
+            println ""
 
-            }
+            println "    Save it as:"
+            println ""
+            println "        metadata.tsv"
+            println ""
 
+            println "Then run Stage 2:"
+            println ""
+
+            println "    nextflow run main.nf \\\\"
+            println "        --stage report \\\\"
+            println "        --consensus ${params.outdir}/consensus/consensus.fasta \\\\"
+            println "        --metadata metadata.tsv \\\\"
+            println "        --outdir ${params.outdir}"
+            println ""
         }
 
 
+        if (params.stage == 'report') {
+
+            println "Stage 2 completed successfully."
+            println ""
+
+            println "Clinical reporting has completed."
+            println ""
+
+            println "Reports:"
+            println ""
+            println "    ${params.outdir}/09_reports/"
+            println ""
+        }
+    }
+    else {
+
+        println "The workflow did not complete successfully."
         println ""
 
-        println "============================================================"
-        println ""
+        if (workflow.errorMessage) {
 
+            println "Error:"
+            println ""
+            println "    ${workflow.errorMessage}"
+            println ""
+        }
     }
 
+
+    println "============================================================"
+    println ""
 }
