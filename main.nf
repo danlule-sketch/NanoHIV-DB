@@ -1,6 +1,5 @@
 #!/usr/bin/env nextflow
 
-
 /*
  * ============================================================
  * NanoHIV-DR
@@ -9,13 +8,13 @@
  * Two-stage Oxford Nanopore HIV drug-resistance workflow.
  *
  *
- * STAGE 1
+ * STAGE 1 — CONSENSUS
  *
  * POD5
  *   ↓
  * Dorado basecalling
  *   ↓
- * Demultiplexing
+ * Dorado demultiplexing
  *   ↓
  * SanitizeMe
  *   ↓
@@ -23,16 +22,16 @@
  *   ↓
  * Minimap2
  *   ↓
- * ┌───────────────┬────────────────┐
- * ↓               ↓
- * Medaka          CodFreq
- * ↓               ↓
- * Consensus       CodFreq results
+ * ┌─────────────────────┬─────────────────────┐
+ * ↓                     ↓
+ * Medaka                CodFreq
+ * ↓                     ↓
+ * Consensus             Variant results
  * ↓
  * Human checkpoint
  *
  *
- * STAGE 2
+ * STAGE 2 — REPORTING
  *
  * consensus.fasta
  *       +
@@ -50,23 +49,6 @@
  * ============================================================
  * Pipeline parameters
  * ============================================================
- *
- * These are default values.
- *
- * They can be overridden from the command line:
- *
- *     --stage
- *     --pod5
- *     --consensus
- *     --metadata
- *     --outdir
- *     --threads
- *     --device
- *     etc.
- *
- * Configuration values in nextflow.config may also override
- * these defaults.
- * ============================================================
  */
 
 params.help = false
@@ -81,29 +63,29 @@ params.outdir = 'results'
 
 params.threads = 8
 
-/*
- * Dorado compute device.
- *
- * "auto" allows Dorado to choose the appropriate available
- * hardware, such as Metal on Apple Silicon, CUDA on NVIDIA
- * systems, or CPU where appropriate.
- */
 params.device = 'auto'
 
-params.dorado_model = 'dna_r10.4.1_e8.2_400bps_sup@v5.2.0'
+params.dorado_model =
+    'dna_r10.4.1_e8.2_400bps_sup@v5.2.0'
 
-params.kit_name = 'SQK-NBD114-96'
+params.kit_name =
+    'SQK-NBD114-96'
 
 params.min_quality = 15
 params.min_length = 800
 params.max_length = 1200
 
-params.hiv_ref = "${baseDir}/references/HIV/HXB2-pol.fasta"
-params.hiv_index = "${baseDir}/references/HIV/HXB2-pol.mmi"
+params.hiv_ref =
+    "${baseDir}/references/HIV/HXB2-pol.fasta"
 
-params.medaka_model = 'r1041_e82_400bps_sup_v5.2.0'
+params.hiv_index =
+    "${baseDir}/references/HIV/HXB2-pol.mmi"
 
-params.metadata_id_column = 'sample_id'
+params.medaka_model =
+    'r1041_e82_400bps_sup_v5.2.0'
+
+params.metadata_id_column =
+    'sample_id'
 
 
 /*
@@ -112,14 +94,37 @@ params.metadata_id_column = 'sample_id'
  * ============================================================
  */
 
-include { DORADO_BASECALL } from './modules/dorado_basecall.nf'
-include { DORADO_DEMUX }   from './modules/dorado_demux.nf'
-include { SANITIZEME }     from './modules/sanitizeme.nf'
-include { NANOQ }          from './modules/nanoq.nf'
-include { MINIMAP2 }       from './modules/minimap2.nf'
-include { MEDAKA }         from './modules/medaka.nf'
-include { CODFREQ }        from './modules/codfreq.nf'
-include { REPORT }         from './modules/report.nf'
+include {
+    DORADO_BASECALL
+} from './modules/dorado_basecall.nf'
+
+include {
+    DORADO_DEMUX
+} from './modules/dorado_demux.nf'
+
+include {
+    SANITIZEME
+} from './modules/sanitizeme.nf'
+
+include {
+    NANOQ
+} from './modules/nanoq.nf'
+
+include {
+    MINIMAP2
+} from './modules/minimap2.nf'
+
+include {
+    MEDAKA
+} from './modules/medaka.nf'
+
+include {
+    CODFREQ
+} from './modules/codfreq.nf'
+
+include {
+    REPORT
+} from './modules/report.nf'
 
 
 /*
@@ -127,7 +132,7 @@ include { REPORT }         from './modules/report.nf'
  * CHECKPOINT_CONSENSUS
  * ============================================================
  *
- * Receives all Medaka consensus FASTA files.
+ * Collects all Medaka consensus FASTA files.
  *
  * Produces:
  *
@@ -135,13 +140,14 @@ include { REPORT }         from './modules/report.nf'
  *     consensus_manifest.tsv
  *     metadata_template.tsv
  *
- * This is the deliberate human checkpoint.
+ * This is the deliberate human checkpoint between Stage 1
+ * and Stage 2.
  * ============================================================
  */
 
 process CHECKPOINT_CONSENSUS {
 
-    tag "consensus-checkpoint"
+    tag 'consensus-checkpoint'
 
     publishDir "${params.outdir}/consensus",
         mode: 'copy',
@@ -154,13 +160,13 @@ process CHECKPOINT_CONSENSUS {
 
     output:
 
-    path "consensus.fasta",
+    path 'consensus.fasta',
         emit: consensus_fasta
 
-    path "consensus_manifest.tsv",
+    path 'consensus_manifest.tsv',
         emit: consensus_manifest
 
-    path "metadata_template.tsv",
+    path 'metadata_template.tsv',
         emit: metadata_template
 
 
@@ -176,13 +182,14 @@ process CHECKPOINT_CONSENSUS {
     echo ""
 
     echo "Collecting Medaka consensus sequences..."
+    echo ""
 
     rm -f consensus.fasta
     touch consensus.fasta
 
 
     # ----------------------------------------------------------
-    # Concatenate FASTA files
+    # Collect FASTA files
     # ----------------------------------------------------------
 
     for f in ${consensus_files}; do
@@ -207,6 +214,10 @@ process CHECKPOINT_CONSENSUS {
 
     done
 
+
+    # ----------------------------------------------------------
+    # Confirm that consensus sequences were produced
+    # ----------------------------------------------------------
 
     if [[ ! -s consensus.fasta ]]; then
 
@@ -233,7 +244,6 @@ from pathlib import Path
 
 input_file = Path("consensus.fasta")
 output_file = Path("consensus.normalised.fasta")
-
 
 records = []
 
@@ -321,16 +331,12 @@ with output_file.open("w") as out:
         seen.add(sample_id)
 
 
-        out.write(
-            f">{sample_id}\n"
-        )
+        out.write(f">{sample_id}\\n")
 
 
         for i in range(0, len(sequence), 80):
 
-            out.write(
-                sequence[i:i + 80] + "\n"
-            )
+            out.write(sequence[i:i + 80] + "\\n")
 
 
 print(
@@ -354,7 +360,7 @@ PY
     awk '
         /^>/ {
             id=substr($0,2)
-            print id "\tconsensus.fasta"
+            print id "\\tconsensus.fasta"
         }
     ' consensus.fasta \
         >> consensus_manifest.tsv
@@ -371,7 +377,7 @@ PY
     awk '
         /^>/ {
             id=substr($0,2)
-            print id "\t\t\t\t"
+            print id "\\t\\t\\t\\t"
         }
     ' consensus.fasta \
         >> metadata_template.tsv
@@ -391,7 +397,6 @@ PY
     echo ""
 
     echo "Consensus sequences: \$COUNT"
-
     echo ""
 
     echo "Files created:"
@@ -399,7 +404,6 @@ PY
     echo "    consensus.fasta"
     echo "    consensus_manifest.tsv"
     echo "    metadata_template.tsv"
-
     echo ""
 
     echo "============================================================"
@@ -410,19 +414,16 @@ PY
     echo "Complete:"
     echo ""
     echo "    metadata_template.tsv"
-
     echo ""
 
     echo "IMPORTANT:"
     echo ""
     echo "DO NOT change the sample_id values."
-
     echo ""
 
     echo "Save the completed metadata file as:"
     echo ""
     echo "    metadata.tsv"
-
     echo ""
 
     echo "Then run Stage 2:"
@@ -448,27 +449,25 @@ PY
  *
  * Validates:
  *
- * 1. Consensus FASTA exists.
- * 2. Consensus identifiers are unique.
- * 3. Metadata contains the required identifier column.
- * 4. Metadata contains data rows.
- * 5. Metadata identifiers are not empty.
- * 6. Metadata identifiers are unique.
- * 7. Every consensus has exactly one metadata row.
- * 8. No metadata row exists without a consensus.
+ *   1. Consensus FASTA exists.
+ *   2. Consensus identifiers are unique.
+ *   3. Metadata contains the required identifier column.
+ *   4. Metadata contains data rows.
+ *   5. Metadata identifiers are not empty.
+ *   6. Metadata identifiers are unique.
+ *   7. Every consensus has exactly one metadata row.
+ *   8. No metadata row exists without a consensus.
  *
  * Produces:
  *
  *     validated_metadata.tsv
- *
- * Only a successfully validated metadata file is passed to
- * the REPORT process.
  * ============================================================
  */
 
 process VALIDATE_METADATA {
 
-    tag "validate-metadata"
+    tag 'validate-metadata'
+
 
     input:
 
@@ -479,7 +478,7 @@ process VALIDATE_METADATA {
 
     output:
 
-    path "validated_metadata.tsv",
+    path 'validated_metadata.tsv',
         emit: validated_metadata
 
 
@@ -521,27 +520,29 @@ with open(
 
         line = line.strip()
 
-        if line.startswith(">"):
-
-            sample_id = line[1:].split()[0]
-
-
-            if not sample_id:
-
-                raise SystemExit(
-                    "ERROR: Empty consensus FASTA identifier."
-                )
+        if not line.startswith(">"):
+            continue
 
 
-            if sample_id in consensus_ids:
-
-                raise SystemExit(
-                    "ERROR: Duplicate consensus identifier: "
-                    + sample_id
-                )
+        sample_id = line[1:].split()[0]
 
 
-            consensus_ids.append(sample_id)
+        if not sample_id:
+
+            raise SystemExit(
+                "ERROR: Empty consensus FASTA identifier."
+            )
+
+
+        if sample_id in consensus_ids:
+
+            raise SystemExit(
+                "ERROR: Duplicate consensus identifier: "
+                + sample_id
+            )
+
+
+        consensus_ids.append(sample_id)
 
 
 if not consensus_ids:
@@ -607,14 +608,10 @@ if not rows:
 # ------------------------------------------------------------
 
 metadata_ids = []
-
 seen = set()
 
 
-for row_number, row in enumerate(
-    rows,
-    start=2
-):
+for row_number, row in enumerate(rows, start=2):
 
     sample_id = (
         row.get(
@@ -805,27 +802,6 @@ sequencing data.
 STAGE 1 — CONSENSUS
 ============================================================
 
-POD5
- ↓
-Dorado
- ↓
-Demultiplexing
- ↓
-SanitizeMe
- ↓
-NanoQ
- ↓
-Minimap2
- ↓
- ┌───────────────┬───────────────┐
- ↓               ↓
-Medaka          CodFreq
- ↓               ↓
-Consensus       CodFreq results
- ↓
-Human checkpoint
-
-
 Run:
 
     nextflow run main.nf \\
@@ -834,7 +810,16 @@ Run:
         --outdir results
 
 
-Stage 1 creates:
+CPU:
+
+    nextflow run main.nf \\
+        --stage consensus \\
+        --pod5 data/pod5 \\
+        --outdir results \\
+        --device cpu
+
+
+Produces:
 
     results/consensus/consensus.fasta
 
@@ -843,15 +828,10 @@ Stage 1 creates:
     results/consensus/metadata_template.tsv
 
 
-Complete:
+Complete metadata_template.tsv without changing the
+sample_id values.
 
-    results/consensus/metadata_template.tsv
-
-
-DO NOT change the sample_id values.
-
-
-Save the completed metadata as:
+Save the completed file as:
 
     metadata.tsv
 
@@ -869,191 +849,117 @@ Run:
         --outdir results
 
 
-Stage 2:
-
-    1. Reads consensus.fasta
-    2. Reads metadata.tsv
-    3. Validates sample identifiers
-    4. Stops if identifiers do not match
-    5. Runs clinical reporting
-
-
-============================================================
-STAGE 1 PARAMETERS
-============================================================
-
-    --stage consensus
-
-        Run the consensus-generation stage.
-
-
-    --pod5 <POD5_DIRECTORY>
-
-        Directory containing Oxford Nanopore POD5 files.
-
-
-============================================================
-STAGE 2 PARAMETERS
-============================================================
-
-    --stage report
-
-        Run the clinical reporting stage.
-
-
-    --consensus <CONSENSUS_FASTA>
-
-        Consensus FASTA produced by Stage 1.
-
-
-    --metadata <METADATA_TSV>
-
-        Completed metadata file.
-
-
 ============================================================
 GENERAL PARAMETERS
 ============================================================
 
-    --outdir <DIRECTORY>
+--outdir <DIRECTORY>
 
-        Output directory.
+    Output directory.
 
-        Default:
-            results
-
-
-    --threads <INTEGER>
-
-        Number of threads used by modules that support
-        the parameter.
-
-        Default:
-            8
+    Default:
+        results
 
 
-    --device <DEVICE>
+--threads <INTEGER>
 
-        Dorado compute device.
+    Number of threads.
 
-        Default:
-            auto
+    Default:
+        8
 
-        Examples:
-            auto
-            cpu
-            cuda:all
-            cuda:0
+
+--device <DEVICE>
+
+    Dorado compute device.
+
+    Default:
+        auto
+
+    Examples:
+        auto
+        cpu
+        cuda:all
+        cuda:0
 
 
 ============================================================
 DORADO
 ============================================================
 
-    --dorado_model <MODEL>
+--dorado_model <MODEL>
 
-        Default:
-            dna_r10.4.1_e8.2_400bps_sup@v5.2.0
+    Default:
+        dna_r10.4.1_e8.2_400bps_sup@v5.2.0
 
 
-    --kit_name <KIT>
+--kit_name <KIT>
 
-        Default:
-            SQK-NBD114-96
+    Default:
+        SQK-NBD114-96
 
 
 ============================================================
 NANOQ
 ============================================================
 
-    --min_quality <INTEGER>
+--min_quality <INTEGER>
 
-        Default:
-            15
-
-
-    --min_length <INTEGER>
-
-        Default:
-            800
+    Default:
+        15
 
 
-    --max_length <INTEGER>
+--min_length <INTEGER>
 
-        Default:
-            1200
+    Default:
+        800
+
+
+--max_length <INTEGER>
+
+    Default:
+        1200
 
 
 ============================================================
-HIV-1 REFERENCE
+HIV REFERENCE
 ============================================================
 
-    --hiv_ref <FASTA>
+--hiv_ref <FASTA>
 
-        Default:
-            references/HIV/HXB2-pol.fasta
+    Default:
+        references/HIV/HXB2-pol.fasta
 
 
-    --hiv_index <MMI>
+--hiv_index <MMI>
 
-        Default:
-            references/HIV/HXB2-pol.mmi
+    Default:
+        references/HIV/HXB2-pol.mmi
 
 
 ============================================================
 MEDAKA
 ============================================================
 
-    --medaka_model <MODEL>
+--medaka_model <MODEL>
 
-        Default:
-            r1041_e82_400bps_sup_v5.2.0
+    Default:
+        r1041_e82_400bps_sup_v5.2.0
 
 
 ============================================================
 METADATA
 ============================================================
 
-    --metadata_id_column <COLUMN>
+--metadata_id_column <COLUMN>
 
-        Column containing the identifier that must match
-        the consensus FASTA identifier.
-
-        Default:
-            sample_id
+    Default:
+        sample_id
 
 
 ============================================================
-EXAMPLES
+RESUME
 ============================================================
-
-Stage 1:
-
-    nextflow run main.nf \\
-        --stage consensus \\
-        --pod5 data/pod5 \\
-        --outdir results
-
-
-Stage 1 using CPU:
-
-    nextflow run main.nf \\
-        --stage consensus \\
-        --pod5 data/pod5 \\
-        --outdir results \\
-        --device cpu
-
-
-Stage 2:
-
-    nextflow run main.nf \\
-        --stage report \\
-        --consensus results/consensus/consensus.fasta \\
-        --metadata metadata.tsv \\
-        --outdir results
-
-
-Resume an interrupted run:
 
     nextflow run main.nf -resume \\
         --stage consensus \\
@@ -1075,7 +981,7 @@ Resume an interrupted run:
      * ========================================================
      */
 
-    if (!(params.stage in ["consensus", "report"])) {
+    if (!(params.stage in ['consensus', 'report'])) {
 
         error """
 
@@ -1103,12 +1009,12 @@ For help:
      * ========================================================
      */
 
-    if (params.stage == "consensus") {
+    if (params.stage == 'consensus') {
 
 
         /*
          * ----------------------------------------------------
-         * Validate POD5
+         * Validate POD5 parameter
          * ----------------------------------------------------
          */
 
@@ -1155,6 +1061,12 @@ Example:
             type: 'file'
         )
 
+
+        /*
+         * ----------------------------------------------------
+         * HIV minimap2 index
+         * ----------------------------------------------------
+         */
 
         hiv_index = channel.fromPath(
             params.hiv_index,
@@ -1211,11 +1123,9 @@ Example:
          * ----------------------------------------------------
          * 5. Minimap2
          *
-         * MINIMAP2 expects:
+         * Expected input:
          *
          *     tuple(index, reads)
-         *
-         * according to the existing workflow/module interface.
          * ----------------------------------------------------
          */
 
@@ -1240,7 +1150,7 @@ Example:
          * ----------------------------------------------------
          * Extract BAM from Minimap2 output.
          *
-         * Existing MINIMAP2 output:
+         * Expected MINIMAP2 output:
          *
          *     BAM
          *     BAI
@@ -1259,14 +1169,11 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * Create BAM + reference channel.
+         * Combine BAM with reference.
          *
-         * This is required by both:
+         * Used by:
          *
          *     MEDAKA
-         *
-         * and:
-         *
          *     CODFREQ
          * ----------------------------------------------------
          */
@@ -1285,7 +1192,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * 6. Medaka consensus
+         * 6. Medaka
          * ----------------------------------------------------
          */
 
@@ -1297,16 +1204,6 @@ Example:
         /*
          * ----------------------------------------------------
          * 7. CodFreq
-         *
-         * IMPORTANT:
-         *
-         * The CODFREQ module has:
-         *
-         *     input:
-         *     tuple path(bam), path(reference)
-         *
-         * Therefore CODFREQ receives ONE channel containing
-         * BAM/reference tuples.
          * ----------------------------------------------------
          */
 
@@ -1326,7 +1223,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * 9. Human consensus checkpoint
+         * 9. Human checkpoint
          * ----------------------------------------------------
          */
 
@@ -1343,7 +1240,7 @@ Example:
      * ========================================================
      */
 
-    if (params.stage == "report") {
+    if (params.stage == 'report') {
 
 
         /*
@@ -1437,13 +1334,6 @@ Example:
         /*
          * ----------------------------------------------------
          * Clinical reporting
-         *
-         * REPORT expects exactly:
-         *
-         *     path fasta
-         *     path metadata
-         *
-         * Therefore it receives exactly two channels.
          * ----------------------------------------------------
          */
 
@@ -1457,22 +1347,16 @@ Example:
 
     /*
      * ========================================================
-     * WORKFLOW COMPLETION SUMMARY
-     * ========================================================
-     *
-     * This handler runs only after the complete workflow has
-     * finished, including all processes that were scheduled.
-     *
-     * It therefore provides the reliable runtime and success
-     * status for the Nextflow execution.
+     * COMPLETION SUMMARY
      * ========================================================
      */
 
     workflow.onComplete = {
 
         def status = workflow.success
-            ? "SUCCESS"
-            : "FAILED"
+            ? 'SUCCESS'
+            : 'FAILED'
+
 
         println ""
 
@@ -1505,23 +1389,31 @@ Example:
 
         println ""
 
+
         if (workflow.success) {
 
-            if (params.stage == "consensus") {
+
+            if (params.stage == 'consensus') {
 
                 println "Stage 1 outputs:"
                 println ""
+
                 println "    ${params.outdir}/consensus/consensus.fasta"
+
                 println "    ${params.outdir}/consensus/consensus_manifest.tsv"
+
                 println "    ${params.outdir}/consensus/metadata_template.tsv"
 
                 println ""
 
                 println "Human checkpoint:"
                 println ""
+
                 println "    Complete metadata_template.tsv"
-                println "    without changing the sample_id values."
+                println "    without changing sample_id values."
+
                 println ""
+
                 println "    Save the completed file as:"
                 println ""
                 println "        metadata.tsv"
@@ -1538,7 +1430,9 @@ Example:
                 println "        --outdir ${params.outdir}"
 
             }
-            else if (params.stage == "report") {
+
+
+            if (params.stage == 'report') {
 
                 println "Clinical reporting completed successfully."
 
@@ -1555,11 +1449,13 @@ Example:
 
                 println "Error:"
                 println ""
+
                 println "    ${workflow.errorMessage}"
 
             }
 
         }
+
 
         println ""
 
@@ -1567,4 +1463,5 @@ Example:
         println ""
 
     }
+
 }
