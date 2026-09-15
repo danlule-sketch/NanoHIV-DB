@@ -96,14 +96,62 @@ RUN micromamba install -y \
 # CodFreq
 # ============================================================
 #
-# CodFreq has older Python dependencies and Cython extensions.
-#
-# It is installed in a separate micromamba environment so
-# that its older dependencies do not interfere with the main
-# NanoHIV-DR environment.
+# CodFreq is installed into its own micromamba environment.
+# The upstream repository does not expose sam2codfreq through
+# console_scripts, so we create a wrapper for the Nextflow
+# process.
 #
 # Source:
 # https://github.com/hivdb/codfreq
+# ============================================================
+
+RUN micromamba create -y \
+    -n codfreq \
+    -c conda-forge \
+    python=3.11 \
+    pip \
+    setuptools \
+    wheel \
+    gcc \
+    gxx \
+    make \
+    cython=0.29.35 \
+    && micromamba clean --all --yes
+
+RUN git clone --depth 1 \
+    https://github.com/hivdb/codfreq.git \
+    /tmp/codfreq
+
+RUN micromamba run -n codfreq \
+    pip install --no-cache-dir \
+    -r /tmp/codfreq/requirements.txt
+
+RUN micromamba run -n codfreq \
+    pip install --no-cache-dir \
+    --ignore-installed \
+    /tmp/codfreq
+
+# sam2codfreq is not a console_scripts entry point in upstream
+# CodFreq, so provide the command expected by NanoHIV-DR.
+RUN mkdir -p /opt/codfreq/bin && \
+    printf '%s\n' \
+        '#!/bin/bash' \
+        'set -euo pipefail' \
+        'exec /opt/conda/envs/codfreq/bin/python -m codfreq.sam2codfreq "$@"' \
+        > /opt/codfreq/bin/sam2codfreq && \
+    chmod +x /opt/codfreq/bin/sam2codfreq
+
+RUN rm -rf /tmp/codfreq
+
+# Make sam2codfreq available to Nextflow.
+ENV PATH="/opt/codfreq/bin:/opt/conda/bin:/opt/dorado/bin:/opt/REPORT:/opt/REPORT/bin:${PATH}"
+
+# Verify CodFreq.
+RUN echo "Checking CodFreq..." && \
+    test -x /opt/codfreq/bin/sam2codfreq && \
+    /opt/codfreq/bin/sam2codfreq --help >/dev/null && \
+    echo "sam2codfreq OK"
+
 #
 # ============================================================
 
