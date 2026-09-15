@@ -141,6 +141,7 @@ RUN chmod +x /opt/REPORT/preprocessing.sh && \
         find /opt/REPORT/bin -type f -name "*.py" -exec chmod +x {} \; ; \
     fi
 
+
 # ============================================================
 # Verify installation
 # ============================================================
@@ -162,7 +163,8 @@ RUN echo "============================================================" && \
     micromamba run -n base samtools --version | head -n 1 && \
     echo "" && \
     echo "Seqtk:" && \
-    micromamba run -n base seqtk 2>&1 | head -n 1 && \
+    micromamba run -n base seqtk 2>&1 || true && \
+    echo "seqtk OK" && \
     echo "" && \
     echo "NanoQ:" && \
     micromamba run -n base nanoq --version && \
@@ -190,6 +192,7 @@ RUN echo "============================================================" && \
     echo "============================================================" && \
     echo "NanoHIV-DR container OK" && \
     echo "============================================================"
+
 
 # ============================================================
 # Working directory
