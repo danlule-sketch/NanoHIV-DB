@@ -75,14 +75,53 @@ params.min_quality = 15
 params.min_length = 800
 params.max_length = 1200
 
+
+/*
+ * ============================================================
+ * Human reference
+ * ============================================================
+ *
+ * Used by SanitizeMe for host-read removal.
+ *
+ * Project file:
+ *
+ *     references/Human/human_g1k_v37.fasta
+ *
+ * ============================================================
+ */
+
+params.human_ref =
+    "${baseDir}/references/Human/human_g1k_v37.fasta"
+
+
+/*
+ * ============================================================
+ * HIV reference
+ * ============================================================
+ */
+
 params.hiv_ref =
     "${baseDir}/references/HIV/HXB2-pol.fasta"
 
 params.hiv_index =
     "${baseDir}/references/HIV/HXB2-pol.mmi"
 
+
+/*
+ * ============================================================
+ * Medaka
+ * ============================================================
+ */
+
 params.medaka_model =
     'r1041_e82_400bps_sup_v5.2.0'
+
+
+/*
+ * ============================================================
+ * Metadata
+ * ============================================================
+ */
 
 params.metadata_id_column =
     'sample_id'
@@ -142,6 +181,7 @@ include {
  *
  * This is the deliberate human checkpoint between Stage 1
  * and Stage 2.
+ *
  * ============================================================
  */
 
@@ -157,7 +197,6 @@ process CHECKPOINT_CONSENSUS {
 
     path consensus_files
 
-
     output:
 
     path 'consensus.fasta',
@@ -168,7 +207,6 @@ process CHECKPOINT_CONSENSUS {
 
     path 'metadata_template.tsv',
         emit: metadata_template
-
 
     script:
 
@@ -183,6 +221,10 @@ process CHECKPOINT_CONSENSUS {
 
     echo "Collecting Medaka consensus sequences..."
     echo ""
+
+    # ----------------------------------------------------------
+    # Initialise consensus FASTA
+    # ----------------------------------------------------------
 
     rm -f consensus.fasta
     touch consensus.fasta
@@ -216,7 +258,7 @@ process CHECKPOINT_CONSENSUS {
 
 
     # ----------------------------------------------------------
-    # Confirm that consensus sequences were produced
+    # Confirm consensus sequences were produced
     # ----------------------------------------------------------
 
     if [[ ! -s consensus.fasta ]]; then
@@ -272,11 +314,9 @@ with input_file.open() as fh:
                     )
                 )
 
-
             current_id = line[1:].split()[0]
 
             sequence = []
-
 
         else:
 
@@ -331,12 +371,14 @@ with output_file.open("w") as out:
         seen.add(sample_id)
 
 
-        out.write(f">{sample_id}\\n")
+        out.write(f">{sample_id}\n")
 
 
         for i in range(0, len(sequence), 80):
 
-            out.write(sequence[i:i + 80] + "\\n")
+            out.write(
+                sequence[i:i + 80] + "\n"
+            )
 
 
 print(
@@ -461,6 +503,7 @@ PY
  * Produces:
  *
  *     validated_metadata.tsv
+ *
  * ============================================================
  */
 
@@ -468,19 +511,16 @@ process VALIDATE_METADATA {
 
     tag 'validate-metadata'
 
-
     input:
 
     path consensus
 
     path metadata
 
-
     output:
 
     path 'validated_metadata.tsv',
         emit: validated_metadata
-
 
     script:
 
@@ -567,7 +607,7 @@ with open(
 
     reader = csv.DictReader(
         fh,
-        delimiter="\\t"
+        delimiter="\t"
     )
 
 
@@ -588,7 +628,7 @@ with open(
 
         raise SystemExit(
             "ERROR: Metadata file must contain the "
-            f"'{REQUIRED_COLUMN}' column.\\n"
+            f"'{REQUIRED_COLUMN}' column.\n"
             f"Columns found: {reader.fieldnames}"
         )
 
@@ -876,12 +916,6 @@ GENERAL PARAMETERS
     Default:
         auto
 
-    Examples:
-        auto
-        cpu
-        cuda:all
-        cuda:0
-
 
 ============================================================
 DORADO
@@ -919,6 +953,19 @@ NANOQ
 
     Default:
         1200
+
+
+============================================================
+HUMAN REFERENCE
+============================================================
+
+--human_ref <FASTA>
+
+    Default:
+        references/Human/human_g1k_v37.fasta
+
+
+Used by SanitizeMe for host-read removal.
 
 
 ============================================================
@@ -1051,6 +1098,27 @@ Example:
 
         /*
          * ----------------------------------------------------
+         * Human reference
+         * ----------------------------------------------------
+         *
+         * Used by SanitizeMe.
+         *
+         * Expected:
+         *
+         *     references/Human/human_g1k_v37.fasta
+         *
+         * ----------------------------------------------------
+         */
+
+        human_reference = channel.fromPath(
+            params.human_ref,
+            checkIfExists: true,
+            type: 'file'
+        )
+
+
+        /*
+         * ----------------------------------------------------
          * HIV reference
          * ----------------------------------------------------
          */
@@ -1101,10 +1169,20 @@ Example:
          * ----------------------------------------------------
          * 3. SanitizeMe
          * ----------------------------------------------------
+         *
+         * Remove human host reads.
+         *
+         * SANITIZEME expects two inputs:
+         *
+         *     1. Demultiplexed FASTQ input
+         *     2. Human reference FASTA
+         *
+         * ----------------------------------------------------
          */
 
         host_removed = SANITIZEME(
-            demultiplexed
+            demultiplexed,
+            human_reference
         )
 
 
@@ -1122,10 +1200,12 @@ Example:
         /*
          * ----------------------------------------------------
          * 5. Minimap2
+         * ----------------------------------------------------
          *
          * Expected input:
          *
          *     tuple(index, reads)
+         *
          * ----------------------------------------------------
          */
 
@@ -1137,7 +1217,6 @@ Example:
                     index,
                     reads
                 )
-
             }
 
 
@@ -1154,6 +1233,7 @@ Example:
          *
          *     BAM
          *     BAI
+         *
          * ----------------------------------------------------
          */
 
@@ -1163,18 +1243,18 @@ Example:
             bai_file ->
 
                 bam_file
-
         }
 
 
         /*
          * ----------------------------------------------------
-         * Combine BAM with reference.
+         * Combine BAM with HIV reference.
          *
          * Used by:
          *
          *     MEDAKA
          *     CODFREQ
+         *
          * ----------------------------------------------------
          */
 
@@ -1186,7 +1266,6 @@ Example:
                     bam_file,
                     reference
                 )
-
             }
 
 
@@ -1367,24 +1446,28 @@ Example:
 
         println "Status:"
         println ""
+
         println "    ${status}"
 
         println ""
 
         println "Duration:"
         println ""
+
         println "    ${workflow.duration}"
 
         println ""
 
         println "Completed:"
         println ""
+
         println "    ${workflow.complete}"
 
         println ""
 
         println "Output directory:"
         println ""
+
         println "    ${params.outdir}"
 
         println ""
@@ -1416,6 +1499,7 @@ Example:
 
                 println "    Save the completed file as:"
                 println ""
+
                 println "        metadata.tsv"
 
                 println ""
