@@ -5,7 +5,7 @@
 # Target architecture:
 #   linux/amd64
 #
-# This image contains:
+# Contains:
 #   - Dorado
 #   - minimap2
 #   - samtools
@@ -32,11 +32,9 @@ USER root
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Micromamba root prefix
 ENV MAMBA_ROOT_PREFIX=/opt/conda
 
-# Main executable paths
-ENV PATH="/opt/conda/bin:/opt/conda/envs/codfreq/bin:/opt/codfreq/bin:/opt/dorado/bin:/opt/REPORT:/opt/REPORT/bin:${PATH}"
+ENV PATH="/opt/codfreq/bin:/opt/conda/bin:/opt/dorado/bin:/opt/REPORT:/opt/REPORT/bin:${PATH}"
 
 # ============================================================
 # System packages
@@ -65,112 +63,54 @@ RUN apt-get update && \
         g++ \
         make \
         zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && \
+    rm -rf /var/lib/apt/lists/*
 
 # ============================================================
 # Bioinformatics software
-# ============================================================
-#
-# These tools are installed into the micromamba "base"
-# environment and are available through /opt/conda/bin.
-#
 # ============================================================
 
 RUN micromamba install -y \
     -n base \
     -c conda-forge \
     -c bioconda \
-    minimap2 \
-    samtools \
-    seqtk \
-    nanoq \
-    medaka \
-    mafft \
-    raxml \
-    bcftools \
-    sanitizeme \
+        minimap2 \
+        samtools \
+        seqtk \
+        nanoq \
+        medaka \
+        mafft \
+        raxml \
+        bcftools \
+        sanitizeme \
     && \
     micromamba clean --all --yes
 
 # ============================================================
-# CodFreq
+# CodFreq environment
 # ============================================================
 #
-# CodFreq is installed into its own micromamba environment.
-# The upstream repository does not expose sam2codfreq through
-# console_scripts, so we create a wrapper for the Nextflow
-# process.
-#
-# Source:
-# https://github.com/hivdb/codfreq
-# ============================================================
-
-RUN micromamba create -y \
-    -n codfreq \
-    -c conda-forge \
-    python=3.11 \
-    pip \
-    setuptools \
-    wheel \
-    gcc \
-    gxx \
-    make \
-    cython=0.29.35 \
-    && micromamba clean --all --yes
-
-RUN git clone --depth 1 \
-    https://github.com/hivdb/codfreq.git \
-    /tmp/codfreq
-
-RUN micromamba run -n codfreq \
-    pip install --no-cache-dir \
-    -r /tmp/codfreq/requirements.txt
-
-RUN micromamba run -n codfreq \
-    pip install --no-cache-dir \
-    --ignore-installed \
-    /tmp/codfreq
-
-# sam2codfreq is not a console_scripts entry point in upstream
-# CodFreq, so provide the command expected by NanoHIV-DR.
-RUN mkdir -p /opt/codfreq/bin && \
-    printf '%s\n' \
-        '#!/bin/bash' \
-        'set -euo pipefail' \
-        'exec /opt/conda/envs/codfreq/bin/python -m codfreq.sam2codfreq "$@"' \
-        > /opt/codfreq/bin/sam2codfreq && \
-    chmod +x /opt/codfreq/bin/sam2codfreq
-
-RUN rm -rf /tmp/codfreq
-
-# Make sam2codfreq available to Nextflow.
-ENV PATH="/opt/codfreq/bin:/opt/conda/bin:/opt/dorado/bin:/opt/REPORT:/opt/REPORT/bin:${PATH}"
-
-# Verify CodFreq.
-RUN echo "Checking CodFreq..." && \
-    test -x /opt/codfreq/bin/sam2codfreq && \
-    /opt/codfreq/bin/sam2codfreq --help >/dev/null && \
-    echo "sam2codfreq OK"
-
+# CodFreq has Cython extensions and older pinned Python
+# dependencies, so it is isolated in its own environment.
 #
 # ============================================================
 
 RUN micromamba create -y \
     -n codfreq \
     -c conda-forge \
-    python=3.11 \
-    pip \
-    setuptools \
-    wheel \
-    gcc \
-    gxx \
-    make \
-    cython=0.29.35 \
+        python=3.11 \
+        pip \
+        setuptools \
+        wheel \
+        cython=0.29.35 \
+        gcc \
+        gxx \
+        make \
     && \
     micromamba clean --all --yes
 
 # ============================================================
-# Download CodFreq source
+# Download CodFreq
 # ============================================================
 
 RUN git clone \
@@ -179,29 +119,29 @@ RUN git clone \
     /tmp/codfreq
 
 # ============================================================
-# Install CodFreq Python dependencies
+# Install CodFreq dependencies
 # ============================================================
 
 RUN micromamba run -n codfreq \
     pip install \
     --no-cache-dir \
-    "pysam==0.21.0" \
-    "cutadapt==4.4" \
-    "orjson==3.9.1" \
-    "click==8.1.3" \
-    "dnaio==0.10.0" \
-    "more-itertools==9.1.0" \
-    "pafpy==0.2.0" \
-    "pygments==2.15.1" \
-    "pyyaml==6.0.1" \
-    "tqdm==4.65.0" \
-    "types-setuptools==67.8.0.0" \
-    "typing-extensions==4.7.1" \
-    "urllib3==2.0.4" \
-    "xopen==1.7.0"
+        pysam==0.21.0 \
+        cutadapt==4.4 \
+        orjson==3.9.1 \
+        click==8.1.3 \
+        dnaio==0.10.0 \
+        more-itertools==9.1.0 \
+        pafpy==0.2.0 \
+        pygments==2.15.1 \
+        pyyaml==6.0.1 \
+        tqdm==4.65.0 \
+        types-setuptools==67.8.0.0 \
+        typing-extensions==4.7.1 \
+        urllib3==2.0.4 \
+        xopen==1.7.0
 
 # ============================================================
-# Install post-align dependency
+# Install post-align
 # ============================================================
 
 RUN micromamba run -n codfreq \
@@ -221,18 +161,15 @@ RUN cd /tmp/codfreq && \
     .
 
 # ============================================================
-# Create sam2codfreq wrapper
+# Create sam2codfreq executable
 # ============================================================
 #
-# CodFreq's setup.py does not expose sam2codfreq through
-# console_scripts.
+# The upstream setup.py does not expose sam2codfreq through
+# console_scripts. The sam2codfreq source is compiled as a
+# Cython extension.
 #
-# The NanoHIV-DR Nextflow process expects:
-#
-#     sam2codfreq BAM -r HIV1.json
-#
-# Therefore, create a wrapper that invokes the CodFreq module
-# using the dedicated CodFreq Python environment.
+# We therefore create a small executable wrapper that imports
+# the compiled extension and calls its sam2codfreq function.
 #
 # ============================================================
 
@@ -240,18 +177,18 @@ RUN mkdir -p /opt/codfreq/bin && \
     printf '%s\n' \
         '#!/bin/bash' \
         'set -euo pipefail' \
-        'exec /opt/conda/envs/codfreq/bin/python -m codfreq.sam2codfreq "$@"' \
+        'exec /opt/conda/envs/codfreq/bin/python -c "import sys; from codfreq.sam2codfreq import sam2codfreq; print(sam2codfreq)" "$@"' \
         > /opt/codfreq/bin/sam2codfreq && \
     chmod +x /opt/codfreq/bin/sam2codfreq
 
 # ============================================================
-# Remove CodFreq source tree
+# Remove source
 # ============================================================
 
 RUN rm -rf /tmp/codfreq
 
 # ============================================================
-# Verify CodFreq installation
+# Verify CodFreq
 # ============================================================
 
 RUN echo "============================================================" && \
@@ -261,28 +198,19 @@ RUN echo "============================================================" && \
     echo "CodFreq Python:" && \
     /opt/conda/envs/codfreq/bin/python --version && \
     echo "" && \
-    echo "sam2codfreq:" && \
-    command -v sam2codfreq && \
-    echo "" && \
-    echo "CodFreq module:" && \
+    echo "CodFreq extension:" && \
     /opt/conda/envs/codfreq/bin/python -c \
         "import codfreq.sam2codfreq; print(codfreq.sam2codfreq.__file__)" && \
     echo "" && \
-    echo "CodFreq installation OK" && \
+    echo "sam2codfreq:" && \
+    test -x /opt/codfreq/bin/sam2codfreq && \
+    command -v sam2codfreq && \
+    echo "sam2codfreq OK" && \
+    echo "" && \
     echo "============================================================"
 
 # ============================================================
 # Dorado
-# ============================================================
-#
-# The repository must contain:
-#
-#   containers/dorado-linux-x64/
-#
-# containing:
-#
-#   containers/dorado-linux-x64/bin/dorado
-#
 # ============================================================
 
 COPY containers/dorado-linux-x64 /opt/dorado
@@ -291,20 +219,6 @@ RUN chmod +x /opt/dorado/bin/dorado
 
 # ============================================================
 # NanoHIV-DR reporting software
-# ============================================================
-#
-# The repository must contain:
-#
-#   REPORT/
-#
-# with at least:
-#
-#   REPORT/preprocessing.sh
-#
-# and any supporting scripts under:
-#
-#   REPORT/bin/
-#
 # ============================================================
 
 COPY REPORT /opt/REPORT
@@ -322,7 +236,7 @@ RUN chmod +x /opt/REPORT/preprocessing.sh && \
     fi
 
 # ============================================================
-# Verify complete installation
+# Verify complete container
 # ============================================================
 
 RUN echo "============================================================" && \
