@@ -20,15 +20,18 @@
  *   ↓
  * NanoQ
  *   ↓
- * Minimap2
- *   ↓
- * ┌─────────────────────┬─────────────────────┐
- * ↓                     ↓
- * Medaka                CodFreq
- * ↓                     ↓
- * Consensus             Variant results
- * ↓
- * Human checkpoint
+ * ┌─────────────────────────────┐
+ * │                             │
+ * ↓                             ↓
+ * CodFreq                    Minimap2
+ * ↓                             ↓
+ * *.codfreq                     BAM
+ *                               ↓
+ *                             Medaka
+ *                               ↓
+ *                         Consensus FASTA
+ *                               ↓
+ *                    Human checkpoint
  *
  *
  * STAGE 2 — REPORTING
@@ -47,7 +50,7 @@
 
 /*
  * ============================================================
- * Pipeline parameters
+ * PIPELINE PARAMETERS
  * ============================================================
  */
 
@@ -65,11 +68,25 @@ params.threads = 8
 
 params.device = 'auto'
 
+
+/*
+ * ============================================================
+ * DORADO
+ * ============================================================
+ */
+
 params.dorado_model =
     'dna_r10.4.1_e8.2_400bps_sup@v5.2.0'
 
 params.kit_name =
     'SQK-NBD114-96'
+
+
+/*
+ * ============================================================
+ * NANOQ
+ * ============================================================
+ */
 
 params.min_quality = 15
 params.min_length = 800
@@ -78,14 +95,10 @@ params.max_length = 1200
 
 /*
  * ============================================================
- * Human reference
+ * HUMAN REFERENCE
  * ============================================================
  *
  * Used by SanitizeMe for host-read removal.
- *
- * Project file:
- *
- *     references/Human/human_g1k_v37.fasta
  *
  * ============================================================
  */
@@ -96,7 +109,11 @@ params.human_ref =
 
 /*
  * ============================================================
- * HIV reference
+ * HIV REFERENCE
+ * ============================================================
+ *
+ * Used for Minimap2 alignment and Medaka polishing.
+ *
  * ============================================================
  */
 
@@ -109,7 +126,22 @@ params.hiv_index =
 
 /*
  * ============================================================
- * Medaka
+ * CODFREQ PROFILE
+ * ============================================================
+ *
+ * CodFreq uses its own HIV-1 alignment profile rather than
+ * the HXB2-pol FASTA used by Minimap2/Medaka.
+ *
+ * ============================================================
+ */
+
+params.codfreq_profile =
+    "${baseDir}/references/HIV/HIV1.json"
+
+
+/*
+ * ============================================================
+ * MEDAKA
  * ============================================================
  */
 
@@ -119,7 +151,7 @@ params.medaka_model =
 
 /*
  * ============================================================
- * Metadata
+ * METADATA
  * ============================================================
  */
 
@@ -129,7 +161,7 @@ params.metadata_id_column =
 
 /*
  * ============================================================
- * Modules
+ * MODULES
  * ============================================================
  */
 
@@ -179,9 +211,6 @@ include {
  *     consensus_manifest.tsv
  *     metadata_template.tsv
  *
- * This is the deliberate human checkpoint between Stage 1
- * and Stage 2.
- *
  * ============================================================
  */
 
@@ -222,17 +251,8 @@ process CHECKPOINT_CONSENSUS {
     echo "Collecting Medaka consensus sequences..."
     echo ""
 
-    # ----------------------------------------------------------
-    # Initialise consensus FASTA
-    # ----------------------------------------------------------
-
     rm -f consensus.fasta
     touch consensus.fasta
-
-
-    # ----------------------------------------------------------
-    # Collect FASTA files
-    # ----------------------------------------------------------
 
     for f in ${consensus_files}; do
 
@@ -257,27 +277,24 @@ process CHECKPOINT_CONSENSUS {
     done
 
 
-    # ----------------------------------------------------------
-    # Confirm consensus sequences were produced
-    # ----------------------------------------------------------
-
     if [[ ! -s consensus.fasta ]]; then
 
         echo ""
         echo "ERROR: No FASTA consensus sequences were found."
         echo ""
-        echo "Files received:"
+
         ls -lh
-        echo ""
 
         exit 1
 
     fi
 
 
-    # ----------------------------------------------------------
-    # Normalise FASTA identifiers
-    # ----------------------------------------------------------
+    /*
+     * --------------------------------------------------------
+     * Normalise FASTA identifiers
+     * --------------------------------------------------------
+     */
 
     python3 - <<'PY'
 
@@ -301,7 +318,6 @@ with input_file.open() as fh:
 
         if not line:
             continue
-
 
         if line.startswith(">"):
 
@@ -370,14 +386,12 @@ with output_file.open("w") as out:
 
         seen.add(sample_id)
 
-
-        out.write(f">{sample_id}\n")
-
+        out.write(f">{sample_id}\\n")
 
         for i in range(0, len(sequence), 80):
 
             out.write(
-                sequence[i:i + 80] + "\n"
+                sequence[i:i + 80] + "\\n"
             )
 
 
@@ -391,9 +405,11 @@ PY
     mv consensus.normalised.fasta consensus.fasta
 
 
-    # ----------------------------------------------------------
-    # Create consensus manifest
-    # ----------------------------------------------------------
+    /*
+     * --------------------------------------------------------
+     * Consensus manifest
+     * --------------------------------------------------------
+     */
 
     echo -e "sample_id\\tconsensus_file" \
         > consensus_manifest.tsv
@@ -408,9 +424,11 @@ PY
         >> consensus_manifest.tsv
 
 
-    # ----------------------------------------------------------
-    # Create metadata template
-    # ----------------------------------------------------------
+    /*
+     * --------------------------------------------------------
+     * Metadata template
+     * --------------------------------------------------------
+     */
 
     echo -e "sample_id\\tpatient_id\\tage\\tsex\\tdate" \
         > metadata_template.tsv
@@ -424,10 +442,6 @@ PY
     ' consensus.fasta \
         >> metadata_template.tsv
 
-
-    # ----------------------------------------------------------
-    # Summary
-    # ----------------------------------------------------------
 
     COUNT=\$(grep -c '^>' consensus.fasta)
 
@@ -488,23 +502,6 @@ PY
  * ============================================================
  * VALIDATE_METADATA
  * ============================================================
- *
- * Validates:
- *
- *   1. Consensus FASTA exists.
- *   2. Consensus identifiers are unique.
- *   3. Metadata contains the required identifier column.
- *   4. Metadata contains data rows.
- *   5. Metadata identifiers are not empty.
- *   6. Metadata identifiers are unique.
- *   7. Every consensus has exactly one metadata row.
- *   8. No metadata row exists without a consensus.
- *
- * Produces:
- *
- *     validated_metadata.tsv
- *
- * ============================================================
  */
 
 process VALIDATE_METADATA {
@@ -544,9 +541,11 @@ print("============================================================")
 print("")
 
 
-# ------------------------------------------------------------
-# Read consensus identifiers
-# ------------------------------------------------------------
+/*
+ * ------------------------------------------------------------
+ * Read consensus identifiers
+ * ------------------------------------------------------------
+ */
 
 consensus_ids = []
 
@@ -563,9 +562,7 @@ with open(
         if not line.startswith(">"):
             continue
 
-
         sample_id = line[1:].split()[0]
-
 
         if not sample_id:
 
@@ -573,14 +570,12 @@ with open(
                 "ERROR: Empty consensus FASTA identifier."
             )
 
-
         if sample_id in consensus_ids:
 
             raise SystemExit(
                 "ERROR: Duplicate consensus identifier: "
                 + sample_id
             )
-
 
         consensus_ids.append(sample_id)
 
@@ -595,9 +590,11 @@ if not consensus_ids:
 consensus_set = set(consensus_ids)
 
 
-# ------------------------------------------------------------
-# Read metadata
-# ------------------------------------------------------------
+/*
+ * ------------------------------------------------------------
+ * Read metadata
+ * ------------------------------------------------------------
+ */
 
 with open(
     METADATA,
@@ -607,9 +604,8 @@ with open(
 
     reader = csv.DictReader(
         fh,
-        delimiter="\t"
+        delimiter="\\t"
     )
-
 
     if reader.fieldnames is None:
 
@@ -617,21 +613,18 @@ with open(
             "ERROR: Metadata file is empty."
         )
 
-
     reader.fieldnames = [
         field.strip()
         for field in reader.fieldnames
     ]
 
-
     if REQUIRED_COLUMN not in reader.fieldnames:
 
         raise SystemExit(
             "ERROR: Metadata file must contain the "
-            f"'{REQUIRED_COLUMN}' column.\n"
+            f"'{REQUIRED_COLUMN}' column.\\n"
             f"Columns found: {reader.fieldnames}"
         )
-
 
     rows = list(reader)
 
@@ -643,9 +636,11 @@ if not rows:
     )
 
 
-# ------------------------------------------------------------
-# Validate metadata identifiers
-# ------------------------------------------------------------
+/*
+ * ------------------------------------------------------------
+ * Validate metadata identifiers
+ * ------------------------------------------------------------
+ */
 
 metadata_ids = []
 seen = set()
@@ -660,14 +655,12 @@ for row_number, row in enumerate(rows, start=2):
         ).strip()
     )
 
-
     if not sample_id:
 
         raise SystemExit(
             f"ERROR: Empty {REQUIRED_COLUMN} "
             f"at metadata row {row_number}."
         )
-
 
     if sample_id in seen:
 
@@ -677,7 +670,6 @@ for row_number, row in enumerate(rows, start=2):
             f"{row_number}."
         )
 
-
     seen.add(sample_id)
 
     metadata_ids.append(sample_id)
@@ -686,14 +678,15 @@ for row_number, row in enumerate(rows, start=2):
 metadata_set = set(metadata_ids)
 
 
-# ------------------------------------------------------------
-# Compare identifiers
-# ------------------------------------------------------------
+/*
+ * ------------------------------------------------------------
+ * Compare identifiers
+ * ------------------------------------------------------------
+ */
 
 missing_metadata = sorted(
     consensus_set - metadata_set
 )
-
 
 extra_metadata = sorted(
     metadata_set - consensus_set
@@ -756,9 +749,11 @@ if missing_metadata or extra_metadata:
     )
 
 
-# ------------------------------------------------------------
-# Write validated metadata
-# ------------------------------------------------------------
+/*
+ * ------------------------------------------------------------
+ * Write validated metadata
+ * ------------------------------------------------------------
+ */
 
 with open(
     METADATA,
@@ -866,6 +861,10 @@ Produces:
     results/consensus/consensus_manifest.tsv
 
     results/consensus/metadata_template.tsv
+
+CodFreq results:
+
+    results/08_codfreq/*.codfreq
 
 
 Complete metadata_template.tsv without changing the
@@ -978,10 +977,26 @@ HIV REFERENCE
         references/HIV/HXB2-pol.fasta
 
 
+Used by Minimap2 and Medaka.
+
+
 --hiv_index <MMI>
 
     Default:
         references/HIV/HXB2-pol.mmi
+
+
+============================================================
+CODFREQ
+============================================================
+
+--codfreq_profile <JSON>
+
+    Default:
+        references/HIV/HIV1.json
+
+
+HIV-1 CodFreq alignment profile used by fastq2codfreq.
 
 
 ============================================================
@@ -1011,7 +1026,8 @@ RESUME
     nextflow run main.nf -resume \\
         --stage consensus \\
         --pod5 data/pod5 \\
-        --outdir results
+        --outdir results \\
+        --device cpu
 
 
 ============================================================
@@ -1024,7 +1040,7 @@ RESUME
 
     /*
      * ========================================================
-     * Validate stage
+     * VALIDATE STAGE
      * ========================================================
      */
 
@@ -1061,7 +1077,7 @@ For help:
 
         /*
          * ----------------------------------------------------
-         * Validate POD5 parameter
+         * Validate POD5
          * ----------------------------------------------------
          */
 
@@ -1085,7 +1101,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * POD5 input
+         * Input channels
          * ----------------------------------------------------
          */
 
@@ -1096,32 +1112,12 @@ Example:
         )
 
 
-        /*
-         * ----------------------------------------------------
-         * Human reference
-         * ----------------------------------------------------
-         *
-         * Used by SanitizeMe.
-         *
-         * Expected:
-         *
-         *     references/Human/human_g1k_v37.fasta
-         *
-         * ----------------------------------------------------
-         */
-
         human_reference = channel.fromPath(
             params.human_ref,
             checkIfExists: true,
             type: 'file'
         )
 
-
-        /*
-         * ----------------------------------------------------
-         * HIV reference
-         * ----------------------------------------------------
-         */
 
         hiv_reference = channel.fromPath(
             params.hiv_ref,
@@ -1130,14 +1126,15 @@ Example:
         )
 
 
-        /*
-         * ----------------------------------------------------
-         * HIV minimap2 index
-         * ----------------------------------------------------
-         */
-
         hiv_index = channel.fromPath(
             params.hiv_index,
+            checkIfExists: true,
+            type: 'file'
+        )
+
+
+        codfreq_profile = channel.fromPath(
+            params.codfreq_profile,
             checkIfExists: true,
             type: 'file'
         )
@@ -1167,16 +1164,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * 3. SanitizeMe
-         * ----------------------------------------------------
-         *
-         * Remove human host reads.
-         *
-         * SANITIZEME expects two inputs:
-         *
-         *     1. Demultiplexed FASTQ input
-         *     2. Human reference FASTA
-         *
+         * 3. Human-read removal
          * ----------------------------------------------------
          */
 
@@ -1199,12 +1187,42 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * 5. Minimap2
+         * 5A. CodFreq
          * ----------------------------------------------------
          *
-         * Expected input:
+         * IMPORTANT:
          *
-         *     tuple(index, reads)
+         * CodFreq operates on FASTQ input.
+         *
+         * Therefore it branches directly from the NanoQ
+         * output rather than using the Minimap2 BAM.
+         *
+         * ----------------------------------------------------
+         */
+
+        codfreq_inputs = filtered
+            .combine(codfreq_profile)
+            .map { reads, profile ->
+
+                tuple(
+                    reads,
+                    profile
+                )
+            }
+
+
+        codfreq_results = CODFREQ(
+            codfreq_inputs
+        )
+
+
+        /*
+         * ----------------------------------------------------
+         * 5B. Minimap2
+         * ----------------------------------------------------
+         *
+         * The same filtered FASTQ is independently sent
+         * to Minimap2 for consensus generation.
          *
          * ----------------------------------------------------
          */
@@ -1228,12 +1246,6 @@ Example:
         /*
          * ----------------------------------------------------
          * Extract BAM from Minimap2 output.
-         *
-         * Expected MINIMAP2 output:
-         *
-         *     BAM
-         *     BAI
-         *
          * ----------------------------------------------------
          */
 
@@ -1249,12 +1261,6 @@ Example:
         /*
          * ----------------------------------------------------
          * Combine BAM with HIV reference.
-         *
-         * Used by:
-         *
-         *     MEDAKA
-         *     CODFREQ
-         *
          * ----------------------------------------------------
          */
 
@@ -1282,18 +1288,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * 7. CodFreq
-         * ----------------------------------------------------
-         */
-
-        codfreq_results = CODFREQ(
-            bam_reference
-        )
-
-
-        /*
-         * ----------------------------------------------------
-         * 8. Collect Medaka consensus files
+         * 7. Collect Medaka consensus files.
          * ----------------------------------------------------
          */
 
@@ -1302,7 +1297,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * 9. Human checkpoint
+         * 8. Human consensus checkpoint.
          * ----------------------------------------------------
          */
 
@@ -1324,7 +1319,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * Validate consensus parameter
+         * Validate consensus parameter.
          * ----------------------------------------------------
          */
 
@@ -1349,7 +1344,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * Validate metadata parameter
+         * Validate metadata parameter.
          * ----------------------------------------------------
          */
 
@@ -1374,7 +1369,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * Consensus FASTA
+         * Input files
          * ----------------------------------------------------
          */
 
@@ -1385,12 +1380,6 @@ Example:
         )
 
 
-        /*
-         * ----------------------------------------------------
-         * Metadata TSV
-         * ----------------------------------------------------
-         */
-
         metadata_input = channel.fromPath(
             params.metadata,
             checkIfExists: true,
@@ -1400,7 +1389,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * Validate metadata
+         * Metadata validation
          * ----------------------------------------------------
          */
 
@@ -1446,30 +1435,22 @@ Example:
 
         println "Status:"
         println ""
-
         println "    ${status}"
-
         println ""
 
         println "Duration:"
         println ""
-
         println "    ${workflow.duration}"
-
         println ""
 
         println "Completed:"
         println ""
-
         println "    ${workflow.complete}"
-
         println ""
 
         println "Output directory:"
         println ""
-
         println "    ${params.outdir}"
-
         println ""
 
 
@@ -1489,6 +1470,13 @@ Example:
 
                 println ""
 
+                println "CodFreq outputs:"
+                println ""
+
+                println "    ${params.outdir}/08_codfreq/*.codfreq"
+
+                println ""
+
                 println "Human checkpoint:"
                 println ""
 
@@ -1499,9 +1487,7 @@ Example:
 
                 println "    Save the completed file as:"
                 println ""
-
                 println "        metadata.tsv"
-
                 println ""
 
                 println "Then run Stage 2:"
@@ -1526,14 +1512,12 @@ Example:
         else {
 
             println "The workflow did not complete successfully."
-
             println ""
 
             if (workflow.errorMessage) {
 
                 println "Error:"
                 println ""
-
                 println "    ${workflow.errorMessage}"
 
             }
@@ -1542,7 +1526,6 @@ Example:
 
 
         println ""
-
         println "============================================================"
         println ""
 
