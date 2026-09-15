@@ -11,6 +11,7 @@ process CODFREQ {
     input:
 
     path reads
+
     path profile
 
     output:
@@ -47,14 +48,12 @@ process CODFREQ {
 
     echo ""
 
-    cp "${profile}" HIV1.json
-
     echo "Running:"
     echo ""
 
     echo "    fastq2codfreq . \\\\"
     echo "        --program minimap2 \\\\"
-    echo "        --profile HIV1.json \\\\"
+    echo "        --profile ${profile} \\\\"
     echo "        --workers ${task.cpus}"
 
     echo ""
@@ -62,7 +61,7 @@ process CODFREQ {
     fastq2codfreq \
         . \
         --program minimap2 \
-        --profile HIV1.json \
+        --profile "${profile}" \
         --workers ${task.cpus}
 
     echo ""
@@ -70,6 +69,7 @@ process CODFREQ {
     echo ""
 
     echo "Output files:"
+    echo ""
 
     find . \
         -maxdepth 1 \
@@ -92,6 +92,7 @@ process CODFREQ {
         ls -lah
 
         exit 1
+
     fi
 
     echo ""
