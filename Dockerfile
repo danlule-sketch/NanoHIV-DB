@@ -22,7 +22,7 @@
 #
 # ============================================================
 
-FROM --platform=linux/amd64 mambaorg/micromamba:latest
+FROM mambaorg/micromamba:latest
 
 # ============================================================
 # Base configuration
@@ -31,10 +31,7 @@ FROM --platform=linux/amd64 mambaorg/micromamba:latest
 USER root
 
 ENV DEBIAN_FRONTEND=noninteractive
-
 ENV MAMBA_ROOT_PREFIX=/opt/conda
-
-ENV PATH="/opt/codfreq/bin:/opt/conda/bin:/opt/dorado/bin:/opt/REPORT:/opt/REPORT/bin:${PATH}"
 
 # ============================================================
 # System packages
@@ -63,8 +60,7 @@ RUN apt-get update && \
         g++ \
         make \
         zlib1g-dev \
-    && \
-    rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # ============================================================
 # Bioinformatics software
@@ -83,14 +79,13 @@ RUN micromamba install -y \
         raxml \
         bcftools \
         sanitizeme \
-    && \
-    micromamba clean --all --yes
+    && micromamba clean --all --yes
 
 # ============================================================
 # CodFreq environment
 # ============================================================
 #
-# CodFreq has Cython extensions and older pinned Python
+# CodFreq contains Cython extensions and uses pinned
 # dependencies, so it is isolated in its own environment.
 #
 # ============================================================
@@ -106,8 +101,7 @@ RUN micromamba create -y \
         gcc \
         gxx \
         make \
-    && \
-    micromamba clean --all --yes
+    && micromamba clean --all --yes
 
 # ============================================================
 # Download CodFreq
@@ -125,20 +119,20 @@ RUN git clone \
 RUN micromamba run -n codfreq \
     pip install \
     --no-cache-dir \
-        pysam==0.21.0 \
-        cutadapt==4.4 \
-        orjson==3.9.1 \
-        click==8.1.3 \
-        dnaio==0.10.0 \
-        more-itertools==9.1.0 \
-        pafpy==0.2.0 \
-        pygments==2.15.1 \
-        pyyaml==6.0.1 \
-        tqdm==4.65.0 \
-        types-setuptools==67.8.0.0 \
-        typing-extensions==4.7.1 \
-        urllib3==2.0.4 \
-        xopen==1.7.0
+        "pysam==0.21.0" \
+        "cutadapt==4.4" \
+        "orjson==3.9.1" \
+        "click==8.1.3" \
+        "dnaio==0.10.0" \
+        "more-itertools==9.1.0" \
+        "pafpy==0.2.0" \
+        "pygments==2.15.1" \
+        "pyyaml==6.0.1" \
+        "tqdm==4.65.0" \
+        "types-setuptools==67.8.0.0" \
+        "typing-extensions==4.7.1" \
+        "urllib3==2.0.4" \
+        "xopen==1.7.0"
 
 # ============================================================
 # Install post-align
@@ -164,12 +158,12 @@ RUN cd /tmp/codfreq && \
 # Create sam2codfreq executable
 # ============================================================
 #
-# The upstream setup.py does not expose sam2codfreq through
-# console_scripts. The sam2codfreq source is compiled as a
-# Cython extension.
+# The upstream CodFreq package does not expose sam2codfreq
+# through console_scripts.
 #
-# We therefore create a small executable wrapper that imports
-# the compiled extension and calls its sam2codfreq function.
+# The compiled Cython extension provides the sam2codfreq
+# callable. This wrapper invokes the module through the
+# dedicated CodFreq Python environment.
 #
 # ============================================================
 
@@ -177,37 +171,15 @@ RUN mkdir -p /opt/codfreq/bin && \
     printf '%s\n' \
         '#!/bin/bash' \
         'set -euo pipefail' \
-        'exec /opt/conda/envs/codfreq/bin/python -c "import sys; from codfreq.sam2codfreq import sam2codfreq; print(sam2codfreq)" "$@"' \
+        'exec /opt/conda/envs/codfreq/bin/python -m codfreq.sam2codfreq "$@"' \
         > /opt/codfreq/bin/sam2codfreq && \
     chmod +x /opt/codfreq/bin/sam2codfreq
 
 # ============================================================
-# Remove source
+# Remove CodFreq source
 # ============================================================
 
 RUN rm -rf /tmp/codfreq
-
-# ============================================================
-# Verify CodFreq
-# ============================================================
-
-RUN echo "============================================================" && \
-    echo "Checking CodFreq" && \
-    echo "============================================================" && \
-    echo "" && \
-    echo "CodFreq Python:" && \
-    /opt/conda/envs/codfreq/bin/python --version && \
-    echo "" && \
-    echo "CodFreq extension:" && \
-    /opt/conda/envs/codfreq/bin/python -c \
-        "import codfreq.sam2codfreq; print(codfreq.sam2codfreq.__file__)" && \
-    echo "" && \
-    echo "sam2codfreq:" && \
-    test -x /opt/codfreq/bin/sam2codfreq && \
-    command -v sam2codfreq && \
-    echo "sam2codfreq OK" && \
-    echo "" && \
-    echo "============================================================"
 
 # ============================================================
 # Dorado
@@ -236,6 +208,21 @@ RUN chmod +x /opt/REPORT/preprocessing.sh && \
     fi
 
 # ============================================================
+# Final executable PATH
+# ============================================================
+#
+# IMPORTANT:
+# /opt/codfreq/bin contains the sam2codfreq executable.
+#
+# Keeping this in PATH makes sam2codfreq available to
+# Nextflow inside the container without requiring an absolute
+# host-specific path.
+#
+# ============================================================
+
+ENV PATH="/opt/codfreq/bin:/opt/conda/envs/codfreq/bin:/opt/conda/bin:/opt/dorado/bin:/opt/REPORT:/opt/REPORT/bin:${PATH}"
+
+# ============================================================
 # Verify complete container
 # ============================================================
 
@@ -249,12 +236,17 @@ RUN echo "============================================================" && \
     echo "CodFreq Python:" && \
     /opt/conda/envs/codfreq/bin/python --version && \
     echo "" && \
+    echo "CodFreq extension:" && \
+    /opt/conda/envs/codfreq/bin/python -c \
+        "import codfreq.sam2codfreq; print(codfreq.sam2codfreq.__file__)" && \
+    echo "" && \
+    echo "sam2codfreq:" && \
+    command -v sam2codfreq && \
+    test -x "$(command -v sam2codfreq)" && \
+    echo "sam2codfreq OK" && \
+    echo "" && \
     echo "Dorado:" && \
     dorado --version && \
-    echo "" && \
-    echo "CodFreq:" && \
-    command -v sam2codfreq && \
-    echo "sam2codfreq OK" && \
     echo "" && \
     echo "Minimap2:" && \
     micromamba run -n base minimap2 --version && \
