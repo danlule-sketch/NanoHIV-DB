@@ -1,6 +1,6 @@
 process CODFREQ {
 
-    tag "${reads.simpleName}"
+    tag "${bam.simpleName}"
 
     cpus params.threads
 
@@ -10,22 +10,14 @@ process CODFREQ {
 
     input:
 
-    path reads
-
+    path bam
+    path bai
     path profile
 
     output:
 
-    path "*.codfreq.tsv",
+    path "*.codfreq",
         emit: codfreq_results
-
-    path "*.bam",
-        emit: codfreq_bam,
-        optional: true
-
-    path "*.bam.bai",
-        emit: codfreq_bai,
-        optional: true
 
     script:
 
@@ -38,8 +30,13 @@ process CODFREQ {
     echo "============================================================"
     echo ""
 
-    echo "Input FASTQ:"
-    echo "    ${reads}"
+    echo "Input BAM:"
+    echo "    ${bam}"
+
+    echo ""
+
+    echo "Input BAI:"
+    echo "    ${bai}"
 
     echo ""
 
@@ -48,21 +45,20 @@ process CODFREQ {
 
     echo ""
 
-    echo "Running:"
-    echo ""
-
-    echo "    fastq2codfreq . \\\\"
-    echo "        --program minimap2 \\\\"
-    echo "        --profile ${profile} \\\\"
-    echo "        --workers ${task.cpus}"
+    echo "Running sam2codfreq..."
 
     echo ""
 
-    fastq2codfreq \
-        . \
-        --program minimap2 \
-        --profile "${profile}" \
-        --workers ${task.cpus}
+    command -v sam2codfreq || {
+        echo "ERROR: sam2codfreq is not installed in the container."
+        echo ""
+        echo "Container: nanohiv-dr-cpu:latest"
+        exit 127
+    }
+
+    sam2codfreq \
+        "${bam}" \
+        -r "${profile}"
 
     echo ""
     echo "CodFreq command completed."
@@ -81,10 +77,10 @@ process CODFREQ {
     if ! find . \
         -maxdepth 1 \
         -type f \
-        -name "*.codfreq.tsv" \
+        -name "*.codfreq" \
         | grep -q .; then
 
-        echo "ERROR: No *.codfreq.tsv file was produced."
+        echo "ERROR: No *.codfreq file was produced."
 
         echo ""
         echo "Directory contents:"
