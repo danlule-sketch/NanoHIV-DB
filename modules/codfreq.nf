@@ -2,7 +2,7 @@ process CODFREQ {
 
     tag "${bam.simpleName}"
 
-    container 'hivdb/codfreq:latest'
+    container 'nanohiv-dr-cpu:latest'
 
     cpus params.threads
 
@@ -58,7 +58,6 @@ process CODFREQ {
         echo "ERROR: No *.codfreq.tsv output was produced."
         ls -lah
         exit 1
-
     fi
 
     echo ""
