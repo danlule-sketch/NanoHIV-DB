@@ -16,15 +16,9 @@
 #   - RAxML
 #   - bcftools
 #   - SanitizeMe
+#   - CodFreq
 #   - Python
 #   - NanoHIV-DR reporting scripts
-#
-# CodFreq is NOT installed here because the Nextflow
-# CODFREQ module uses:
-#
-#   hivdb/codfreq:latest
-#
-# as its own container.
 # ============================================================
 
 FROM --platform=linux/amd64 mambaorg/micromamba:latest
@@ -37,13 +31,8 @@ USER root
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Micromamba root prefix
 ENV MAMBA_ROOT_PREFIX=/opt/conda
 
-# Main executable paths
-#
-# All Conda/micromamba software is installed into the
-# "base" environment, so explicitly expose its bin directory.
 ENV PATH="/opt/conda/bin:/opt/dorado/bin:/opt/REPORT:/opt/REPORT/bin:${PATH}"
 
 # ============================================================
@@ -68,17 +57,16 @@ RUN apt-get update && \
         sed \
         gawk \
         findutils \
+        build-essential \
+        zlib1g-dev \
+        libbz2-dev \
+        liblzma-dev \
+        libncurses-dev \
+        libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # ============================================================
 # Bioinformatics software
-# ============================================================
-#
-# Everything is installed into the micromamba "base"
-# environment.
-#
-# Keeping these tools in one environment makes them directly
-# available to Nextflow when the container is used.
 # ============================================================
 
 RUN micromamba install -y \
@@ -95,6 +83,33 @@ RUN micromamba install -y \
     bcftools \
     sanitizeme \
     && micromamba clean --all --yes
+
+# ============================================================
+# CodFreq
+# ============================================================
+#
+# CodFreq source:
+#
+#   https://github.com/hivdb/codfreq
+#
+# CodFreq provides sam2codfreq and related commands.
+# ============================================================
+
+RUN git clone --depth 1 \
+        https://github.com/hivdb/codfreq.git \
+        /opt/codfreq
+
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    python3 -m pip install --no-cache-dir \
+        cython==0.29.35 \
+        pysam==0.21.0 \
+        cutadapt==4.4 \
+        orjson==3.9.1 && \
+    python3 -m pip install --no-cache-dir \
+        -r /opt/codfreq/requirements.txt && \
+    python3 -m pip install --no-cache-dir \
+        --ignore-installed \
+        /opt/codfreq
 
 # ============================================================
 # Dorado
@@ -116,19 +131,6 @@ RUN chmod +x /opt/dorado/bin/dorado
 # ============================================================
 # NanoHIV-DR reporting software
 # ============================================================
-#
-# The repository must contain:
-#
-#   REPORT/
-#
-# with at least:
-#
-#   REPORT/preprocessing.sh
-#
-# and any supporting scripts under:
-#
-#   REPORT/bin/
-# ============================================================
 
 COPY REPORT /opt/REPORT
 
@@ -138,7 +140,10 @@ COPY REPORT /opt/REPORT
 
 RUN chmod +x /opt/REPORT/preprocessing.sh && \
     if [ -d /opt/REPORT/bin ]; then \
-        find /opt/REPORT/bin -type f -name "*.py" -exec chmod +x {} \; ; \
+        find /opt/REPORT/bin \
+            -type f \
+            -name "*.py" \
+            -exec chmod +x {} \; ; \
     fi
 
 # ============================================================
@@ -184,6 +189,11 @@ RUN echo "============================================================" && \
     echo "SanitizeMe:" && \
     micromamba run -n base SanitizeMe_CLI.py -h >/dev/null && \
     echo "SanitizeMe_CLI.py OK" && \
+    echo "" && \
+    echo "CodFreq:" && \
+    command -v sam2codfreq && \
+    sam2codfreq --help >/dev/null && \
+    echo "sam2codfreq OK" && \
     echo "" && \
     echo "REPORT:" && \
     test -x /opt/REPORT/preprocessing.sh && \
