@@ -40,8 +40,7 @@ process CODFREQ {
 
     bin/align-all-local \
         -r ${profile} \
-        -d codfreq_input \
-        -m
+        -d codfreq_input
 
     echo ""
     echo "CodFreq analysis complete."
@@ -58,8 +57,8 @@ process CODFREQ {
         echo ""
         echo "ERROR: CodFreq did not produce a .codfreq.gz file."
         echo ""
+
         ls -lah codfreq_input
-        echo ""
 
         exit 1
 
