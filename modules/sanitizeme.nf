@@ -8,23 +8,25 @@ process SANITIZEME {
 
     input:
     path reads
-    path host_reference
+    path human_reference
 
     output:
     path "${reads.simpleName}_filtered.fastq"
 
     script:
     """
-    mkdir -p sanitizeme_output
+    mkdir -p sanitizeme_input
+
+    cp ${reads} sanitizeme_input/
 
     SanitizeMe_CLI.py \
-        -i . \
-        -r ${host_reference} \
-        -o sanitizeme_output \
+        -i sanitizeme_input \
+        -r ${human_reference} \
+        -o . \
         -t ${task.cpus} \
         --Nanopore
 
-    cp sanitizeme_output/${reads.simpleName}_filtered.fastq \
-       ${reads.simpleName}_filtered.fastq
+    mv sanitizeme_input_filtered.fastq \
+        ${reads.simpleName}_filtered.fastq
     """
 }
