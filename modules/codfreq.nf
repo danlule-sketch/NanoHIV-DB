@@ -36,7 +36,7 @@ process CODFREQ {
 
     input:
 
-    tuple path(profile), path(reads)
+    tuple path(reads), path(profile)
 
 
     output:
