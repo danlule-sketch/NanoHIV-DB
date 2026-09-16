@@ -217,7 +217,7 @@ process CHECKPOINT_CONSENSUS {
 
     input:
 
-    path consensus_files
+    path consensus_files, stageAs: 'medaka_*.fasta'
 
     output:
 
