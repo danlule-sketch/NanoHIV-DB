@@ -367,11 +367,11 @@ with output_file.open("w") as out:
 
         seen.add(sample_id)
 
-        out.write(f">{sample_id}\n")
+        out.write(f">{sample_id}" + chr(10))
 
         for i in range(0, len(sequence), 80):
 
-            out.write(sequence[i:i + 80] + "\n")
+            out.write(sequence[i:i + 80] + chr(10))
 
 
 print(
