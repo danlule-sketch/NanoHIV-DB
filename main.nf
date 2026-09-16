@@ -5,9 +5,10 @@
  * NanoHIV-DR
  * ============================================================
  *
- * Two-stage Oxford Nanopore HIV drug-resistance workflow.
+ * Oxford Nanopore HIV drug-resistance workflow.
  *
- * STAGE 1 — CONSENSUS
+ *
+ * STAGE 1 — SEQUENCING / CONSENSUS
  *
  * POD5
  *   ↓
@@ -18,16 +19,28 @@
  * SanitizeMe
  *   ↓
  * NanoQ
+ *   │
+ *   ├──────────────────────────────┐
+ *   │                              │
+ *   ▼                              ▼
+ * Medaka                         Minimap2
+ *   │                              │
+ *   ▼                              ▼
+ * Consensus FASTA                BAM + BAI
+ *   │
+ *   └──→ Sierra-Local / Reporting
+ *
+ *
+ * NanoQ also provides the input for the CodFreq arm:
+ *
+ * NanoQ FASTQ
  *   ↓
- * Minimap2
+ * alignment required by CodFreq
  *   ↓
- * ┌─────────────────────┬─────────────────────┐
- * ↓                     ↓
- * Medaka                CodFreq
- * ↓                     ↓
- * Consensus             Codon-frequency results
- * ↓
- * Human checkpoint
+ * CodFreq
+ *   ↓
+ * Codon-frequency results
+ *
  *
  * STAGE 2 — REPORTING
  *
@@ -45,7 +58,7 @@
 
 /*
  * ============================================================
- * Pipeline parameters
+ * Parameters
  * ============================================================
  */
 
@@ -113,7 +126,7 @@ params.hiv_index =
 
 /*
  * ============================================================
- * CodFreq profile
+ * CodFreq
  * ============================================================
  */
 
@@ -139,6 +152,16 @@ params.medaka_model =
 
 params.metadata_id_column =
     'sample_id'
+
+
+/*
+ * ============================================================
+ * Reporting
+ * ============================================================
+ */
+
+params.hiv_alignment =
+    "${baseDir}/references/HIV/HIV_aligned_references.fasta"
 
 
 /*
@@ -190,7 +213,7 @@ process CHECKPOINT_CONSENSUS {
 
     tag 'consensus-checkpoint'
 
-    publishDir "${params.outdir}/consensus",
+    publishDir "${params.outdir}/05_consensus",
         mode: 'copy',
         overwrite: true
 
@@ -226,6 +249,7 @@ process CHECKPOINT_CONSENSUS {
     rm -f consensus.fasta
     touch consensus.fasta
 
+
     for f in ${consensus_files}; do
 
         case "\$f" in
@@ -233,6 +257,7 @@ process CHECKPOINT_CONSENSUS {
             *.fa|*.fasta|*.fna)
 
                 echo "Adding: \$f"
+
                 cat "\$f" >> consensus.fasta
 
                 ;;
@@ -265,8 +290,10 @@ process CHECKPOINT_CONSENSUS {
 
 from pathlib import Path
 
+
 input_file = Path("consensus.fasta")
 output_file = Path("consensus.normalised.fasta")
+
 
 records = []
 
@@ -353,7 +380,9 @@ with output_file.open("w") as out:
 
         for i in range(0, len(sequence), 80):
 
-            out.write(sequence[i:i + 80] + "\n")
+            out.write(
+                sequence[i:i + 80] + "\n"
+            )
 
 
 print(
@@ -363,7 +392,9 @@ print(
 PY
 
 
-    mv consensus.normalised.fasta consensus.fasta
+    mv \
+        consensus.normalised.fasta \
+        consensus.fasta
 
 
     echo -e "sample_id\\tconsensus_file" \
@@ -436,7 +467,7 @@ PY
 
     echo "nextflow run main.nf \\\\"
     echo "    --stage report \\\\"
-    echo "    --consensus ${params.outdir}/consensus/consensus.fasta \\\\"
+    echo "    --consensus ${params.outdir}/05_consensus/consensus.fasta \\\\"
     echo "    --metadata metadata.tsv \\\\"
     echo "    --outdir ${params.outdir}"
 
@@ -476,6 +507,7 @@ process VALIDATE_METADATA {
     python3 - <<'PY'
 
 import csv
+
 
 CONSENSUS = "${consensus}"
 METADATA = "${metadata}"
@@ -723,6 +755,7 @@ PY
 
 workflow {
 
+
     /*
      * ========================================================
      * HELP
@@ -737,12 +770,7 @@ workflow {
                     NanoHIV-DR Pipeline
 ============================================================
 
-Two-stage HIV drug-resistance workflow for Oxford Nanopore
-sequencing data.
-
-
-============================================================
-STAGE 1 — CONSENSUS
+STAGE 1 — CONSENSUS / ANALYSIS
 ============================================================
 
 Run:
@@ -762,13 +790,57 @@ CPU:
         --device cpu
 
 
-Produces:
+Stage 1 performs:
 
-    results/consensus/consensus.fasta
+    POD5
+      ↓
+    Dorado basecalling
+      ↓
+    Dorado demultiplexing
+      ↓
+    SanitizeMe
+      ↓
+    NanoQ
+      │
+      ├── Medaka
+      │     ↓
+      │   Consensus FASTA
+      │
+      ├── Minimap2
+      │     ↓
+      │   BAM + BAI
+      │
+      └── CodFreq
+            ↓
+        Codon-frequency results
 
-    results/consensus/consensus_manifest.tsv
 
-    results/consensus/metadata_template.tsv
+Outputs:
+
+    results/01_basecalled/
+
+    results/02_demultiplexed/
+
+    results/03_removehost/
+
+    results/04_nanoq/
+
+    results/05_consensus/
+
+    results/06_minimap2/
+
+    results/08_codfreq/
+
+    results/09_reports/
+
+
+The consensus checkpoint creates:
+
+    consensus.fasta
+
+    consensus_manifest.tsv
+
+    metadata_template.tsv
 
 
 Complete metadata_template.tsv without changing the
@@ -787,7 +859,7 @@ Run:
 
     nextflow run main.nf \\
         --stage report \\
-        --consensus results/consensus/consensus.fasta \\
+        --consensus results/05_consensus/consensus.fasta \\
         --metadata metadata.tsv \\
         --outdir results
 
@@ -798,23 +870,17 @@ GENERAL PARAMETERS
 
 --outdir <DIRECTORY>
 
-    Output directory.
-
     Default:
         results
 
 
 --threads <INTEGER>
 
-    Number of threads.
-
     Default:
         8
 
 
 --device <DEVICE>
-
-    Dorado compute device.
 
     Default:
         auto
@@ -894,10 +960,6 @@ CODFREQ
         references/HIV/HIV1.json
 
 
-CodFreq receives the BAM and BAI generated by Minimap2
-and uses HIV1.json as its CodFreq profile.
-
-
 ============================================================
 MEDAKA
 ============================================================
@@ -966,11 +1028,12 @@ For help:
 
     /*
      * ========================================================
-     * STAGE 1 — CONSENSUS
+     * STAGE 1
      * ========================================================
      */
 
     if (params.stage == 'consensus') {
+
 
         if (!params.pod5) {
 
@@ -989,6 +1052,12 @@ Example:
 """
         }
 
+
+        /*
+         * ----------------------------------------------------
+         * Input references
+         * ----------------------------------------------------
+         */
 
         pod5_input = channel.fromPath(
             params.pod5,
@@ -1026,7 +1095,9 @@ Example:
 
 
         /*
+         * ----------------------------------------------------
          * 1. Dorado basecalling
+         * ----------------------------------------------------
          */
 
         basecalled = DORADO_BASECALL(
@@ -1035,7 +1106,9 @@ Example:
 
 
         /*
+         * ----------------------------------------------------
          * 2. Dorado demultiplexing
+         * ----------------------------------------------------
          */
 
         demultiplexed = DORADO_DEMUX(
@@ -1044,7 +1117,9 @@ Example:
 
 
         /*
+         * ----------------------------------------------------
          * 3. SanitizeMe
+         * ----------------------------------------------------
          */
 
         host_removed = SANITIZEME(
@@ -1054,7 +1129,22 @@ Example:
 
 
         /*
+         * ----------------------------------------------------
          * 4. NanoQ
+         * ----------------------------------------------------
+         *
+         * THIS IS THE BRANCHING POINT.
+         *
+         * The NanoQ output is retained as a single channel
+         * and consumed independently by:
+         *
+         *     A. Medaka
+         *     B. Minimap2
+         *     C. CodFreq alignment
+         *
+         * NanoQ itself is executed only once.
+         *
+         * ----------------------------------------------------
          */
 
         filtered = NANOQ(
@@ -1063,7 +1153,60 @@ Example:
 
 
         /*
-         * 5. Minimap2
+         * ====================================================
+         * ARM 1 — MEDAKA
+         * ====================================================
+         *
+         * NanoQ FASTQ → Medaka → consensus FASTA
+         *
+         * IMPORTANT:
+         *
+         * The MEDAKA module must accept:
+         *
+         *     tuple(path(reads), path(reference))
+         *
+         * rather than the current BAM/reference interface.
+         * ----------------------------------------------------
+         */
+
+        medaka_input = filtered
+            .combine(hiv_reference)
+            .map { reads, reference ->
+
+                tuple(
+                    reads,
+                    reference
+                )
+            }
+
+
+        polished = MEDAKA(
+            medaka_input
+        )
+
+
+        /*
+         * Collect consensus files for checkpoint.
+         */
+
+        consensus_files = polished.collect()
+
+
+        CHECKPOINT_CONSENSUS(
+            consensus_files
+        )
+
+
+        /*
+         * ====================================================
+         * ARM 2 — MINIMAP2
+         * ====================================================
+         *
+         * NanoQ FASTQ → Minimap2 → BAM + BAI
+         *
+         * The BAM/BAI output is independent of Medaka.
+         *
+         * ----------------------------------------------------
          */
 
         minimap_inputs = filtered
@@ -1083,83 +1226,115 @@ Example:
 
 
         /*
-         * Extract BAM and BAI.
+         * Publish/retain BAM and BAI.
+         *
+         * The exact tuple order is based on the existing
+         * workflow:
+         *
+         *     bam_file
+         *     bai_file
+         *
+         * ----------------------------------------------------
          */
 
         bam = alignment.map {
-
             bam_file,
             bai_file -> bam_file
         }
 
 
         bai = alignment.map {
-
             bam_file,
             bai_file -> bai_file
         }
 
 
         /*
-         * Combine BAM with HIV reference for Medaka.
+         * ====================================================
+         * ARM 3 — CODFREQ
+         * ====================================================
+         *
+         * The important architectural rule is that this
+         * arm starts from NanoQ, not from the Medaka or
+         * Minimap2 output channel.
+         *
+         * ----------------------------------------------------
+         *
+         * CURRENT CODFREQ MODULE:
+         *
+         *     tuple path(bam), path(bai), path(profile)
+         *
+         * Therefore a BAM must exist before CODFREQ can run.
+         *
+         * If CODFREQ requires BAM input, this arm requires
+         * its own alignment operation:
+         *
+         *     NanoQ FASTQ
+         *          ↓
+         *     alignment for CodFreq
+         *          ↓
+         *     BAM + BAI
+         *          ↓
+         *     CodFreq
+         *
+         * This is deliberately separate from ARM 2.
+         *
+         * ----------------------------------------------------
          */
 
-        bam_reference = bam
-            .combine(hiv_reference)
-            .map { bam_file, reference ->
+        codfreq_alignment_inputs = filtered
+            .combine(hiv_index)
+            .map { reads, index ->
 
                 tuple(
-                    bam_file,
-                    reference
+                    index,
+                    reads
                 )
             }
 
 
         /*
-         * 6. Medaka
+         * A second MINIMAP2 invocation is used here because
+         * the current CODFREQ module requires BAM + BAI.
+         *
+         * If your final CodFreq module is changed to accept
+         * NanoQ FASTQ directly, this entire alignment block
+         * can be removed.
          */
 
-        polished = MEDAKA(
-            bam_reference
+        codfreq_alignment = MINIMAP2(
+            codfreq_alignment_inputs
         )
 
-			
-		/*
- 		* ----------------------------------------------------
- 		* 7. CodFreq
- 		* ----------------------------------------------------
- 		*/	
- 		
- 		codfreq_input = alignment
- 			.combine(codfreq_profile)
- 			.map { bam_file, bai_file, profile ->
- 			
- 				tuple(
- 					bam_file,
- 					bai_file,
- 					profile
- 				)
- 			}
- 			
- 		codfreq_results = CODFREQ(
- 			codfreq_input
- 		)
-						
 
-        /*
-         * 8. Collect Medaka consensus files.
-         */
+        codfreq_input = codfreq_alignment
+            .combine(codfreq_profile)
+            .map {
+                bam_file,
+                bai_file,
+                profile ->
 
-        consensus_files = polished.collect()
+                tuple(
+                    bam_file,
+                    bai_file,
+                    profile
+                )
+            }
+
+
+        codfreq_results = CODFREQ(
+            codfreq_input
+        )
 
 
         /*
-         * 9. Human checkpoint.
+         * Prevent unused-channel ambiguity and make the
+         * intended Stage 1 outputs explicit.
          */
 
-        CHECKPOINT_CONSENSUS(
-            consensus_files
-        )
+        codfreq_results.view {
+            "CodFreq result: ${it}"
+        }
 
     }
 
@@ -1171,6 +1346,7 @@ Example:
      */
 
     if (params.stage == 'report') {
+
 
         if (!params.consensus) {
 
@@ -1184,7 +1360,7 @@ Example:
 
     nextflow run main.nf \\
         --stage report \\
-        --consensus results/consensus/consensus.fasta \\
+        --consensus results/05_consensus/consensus.fasta \\
         --metadata metadata.tsv
 
 """
@@ -1203,12 +1379,18 @@ Example:
 
     nextflow run main.nf \\
         --stage report \\
-        --consensus results/consensus/consensus.fasta \\
+        --consensus results/05_consensus/consensus.fasta \\
         --metadata metadata.tsv
 
 """
         }
 
+
+        /*
+         * ----------------------------------------------------
+         * Consensus input
+         * ----------------------------------------------------
+         */
 
         consensus_input = channel.fromPath(
             params.consensus,
@@ -1217,6 +1399,12 @@ Example:
         )
 
 
+        /*
+         * ----------------------------------------------------
+         * Metadata input
+         * ----------------------------------------------------
+         */
+
         metadata_input = channel.fromPath(
             params.metadata,
             checkIfExists: true,
@@ -1224,11 +1412,23 @@ Example:
         )
 
 
+        /*
+         * ----------------------------------------------------
+         * Metadata validation
+         * ----------------------------------------------------
+         */
+
         validated_metadata = VALIDATE_METADATA(
             consensus_input,
             metadata_input
         )
 
+
+        /*
+         * ----------------------------------------------------
+         * Clinical reporting
+         * ----------------------------------------------------
+         */
 
         REPORT(
             consensus_input,
@@ -1289,38 +1489,37 @@ Example:
 
         if (workflow.success) {
 
+
             if (params.stage == 'consensus') {
 
                 println "Stage 1 outputs:"
                 println ""
 
-                println "    ${params.outdir}/consensus/consensus.fasta"
-
-                println "    ${params.outdir}/consensus/consensus_manifest.tsv"
-
-                println "    ${params.outdir}/consensus/metadata_template.tsv"
-
-                println ""
-
-                println "CodFreq results:"
-                println ""
-
+                println "    ${params.outdir}/01_basecalled/"
+                println "    ${params.outdir}/02_demultiplexed/"
+                println "    ${params.outdir}/03_removehost/"
+                println "    ${params.outdir}/04_nanoq/"
+                println "    ${params.outdir}/05_consensus/"
+                println "    ${params.outdir}/06_minimap2/"
                 println "    ${params.outdir}/08_codfreq/"
-
                 println ""
 
                 println "Human checkpoint:"
                 println ""
 
-                println "    Complete metadata_template.tsv"
-                println "    without changing sample_id values."
+                println "    ${params.outdir}/05_consensus/metadata_template.tsv"
 
                 println ""
 
-                println "    Save the completed file as:"
+                println "Complete metadata_template.tsv"
+                println "without changing sample_id values."
+
                 println ""
 
-                println "        metadata.tsv"
+                println "Save the completed file as:"
+                println ""
+
+                println "    metadata.tsv"
 
                 println ""
 
@@ -1329,7 +1528,7 @@ Example:
 
                 println "    nextflow run main.nf \\"
                 println "        --stage report \\"
-                println "        --consensus ${params.outdir}/consensus/consensus.fasta \\"
+                println "        --consensus ${params.outdir}/05_consensus/consensus.fasta \\"
                 println "        --metadata metadata.tsv \\"
                 println "        --outdir ${params.outdir}"
 
