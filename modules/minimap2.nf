@@ -1,112 +1,158 @@
-script:
+/*
+ * ============================================================
+ * MINIMAP2
+ * ============================================================
+ *
+ * Input:
+ *
+ *     NanoQ filtered FASTQ
+ *             +
+ *     HIV-1 minimap2 index (.mmi)
+ *
+ * Output:
+ *
+ *     BAM
+ *     BAI
+ *
+ * This is Branch 2 of the NanoHIV-DR workflow.
+ *
+ * NanoQ
+ *    ↓
+ * MINIMAP2
+ *    ↓
+ * BAM + BAI
+ *
+ * ============================================================
+ */
 
-def sample = reads.simpleName
-    .replaceFirst(/\.trimmed$/, '')
+process MINIMAP2 {
 
-"""
-set -euo pipefail
+    tag "${reads.simpleName}"
 
-echo "============================================================"
-echo " MINIMAP2"
-echo "============================================================"
-echo ""
+    cpus params.threads
 
-echo "Sample:"
-echo "    ${sample}"
-echo ""
+    publishDir "${params.outdir}/06_minimap2",
+        mode: 'copy',
+        overwrite: true
 
-echo "Input FASTQ:"
-echo "    ${reads}"
-echo ""
+    input:
 
-echo "Reference index:"
-echo "    ${index}"
-echo ""
+    tuple path(index), path(reads)
 
-echo "Threads:"
-echo "    ${task.cpus}"
-echo ""
+    output:
 
-# --------------------------------------------------------
-# Alignment
-# --------------------------------------------------------
+    tuple path("*.bam"), path("*.bam.bai"),
+        emit: alignment
 
-minimap2 \
-    -ax map-ont \
-    -t ${task.cpus} \
-    "${index}" \
-    "${reads}" \
-    | samtools sort \
+    script:
+
+    def sample = reads.simpleName
+        .replaceFirst(/\.trimmed$/, '')
+
+    """
+    set -euo pipefail
+
+    echo "============================================================"
+    echo " MINIMAP2"
+    echo "============================================================"
+    echo ""
+
+    echo "Sample:"
+    echo "    ${sample}"
+    echo ""
+
+    echo "Input FASTQ:"
+    echo "    ${reads}"
+    echo ""
+
+    echo "Reference index:"
+    echo "    ${index}"
+    echo ""
+
+    echo "Threads:"
+    echo "    ${task.cpus}"
+    echo ""
+
+    # --------------------------------------------------------
+    # Alignment
+    # --------------------------------------------------------
+
+    minimap2 \
+        -ax map-ont \
+        -t ${task.cpus} \
+        "${index}" \
+        "${reads}" \
+        | samtools sort \
+            -@ ${task.cpus} \
+            -o "${sample}.bam" \
+            -
+
+    # --------------------------------------------------------
+    # BAM index
+    # --------------------------------------------------------
+
+    samtools index \
         -@ ${task.cpus} \
-        -o "${sample}.bam" \
-        -
+        "${sample}.bam"
 
-# --------------------------------------------------------
-# BAM index
-# --------------------------------------------------------
+    # --------------------------------------------------------
+    # Validate outputs
+    # --------------------------------------------------------
 
-samtools index \
-    -@ ${task.cpus} \
-    "${sample}.bam"
+    if [[ ! -s "${sample}.bam" ]]; then
 
-# --------------------------------------------------------
-# Validate outputs
-# --------------------------------------------------------
+        echo ""
+        echo "ERROR: Minimap2 produced an empty BAM file."
+        echo ""
 
-if [[ ! -s "${sample}.bam" ]]; then
+        exit 1
+
+    fi
+
+    if [[ ! -s "${sample}.bam.bai" ]]; then
+
+        echo ""
+        echo "ERROR: Samtools failed to create BAM index."
+        echo ""
+
+        exit 1
+
+    fi
+
+    # --------------------------------------------------------
+    # BAM statistics
+    # --------------------------------------------------------
 
     echo ""
-    echo "ERROR: Minimap2 produced an empty BAM file."
+    echo "BAM statistics:"
     echo ""
 
-    exit 1
+    samtools flagstat \
+        "${sample}.bam" \
+        || true
 
-fi
-
-if [[ ! -s "${sample}.bam.bai" ]]; then
+    # --------------------------------------------------------
+    # Final output
+    # --------------------------------------------------------
 
     echo ""
-    echo "ERROR: Samtools failed to create BAM index."
+    echo "============================================================"
+    echo " MINIMAP2 COMPLETE"
+    echo "============================================================"
     echo ""
 
-    exit 1
+    echo "BAM:"
+    echo "    ${sample}.bam"
+    echo ""
 
-fi
+    echo "BAI:"
+    echo "    ${sample}.bam.bai"
+    echo ""
 
-# --------------------------------------------------------
-# BAM statistics
-# --------------------------------------------------------
+    ls -lh \
+        "${sample}.bam" \
+        "${sample}.bam.bai"
 
-echo ""
-echo "BAM statistics:"
-echo ""
-
-samtools flagstat \
-    "${sample}.bam" \
-    || true
-
-# --------------------------------------------------------
-# Final output
-# --------------------------------------------------------
-
-echo ""
-echo "============================================================"
-echo " MINIMAP2 COMPLETE"
-echo "============================================================"
-echo ""
-
-echo "BAM:"
-echo "    ${sample}.bam"
-echo ""
-
-echo "BAI:"
-echo "    ${sample}.bam.bai"
-echo ""
-
-ls -lh \
-    "${sample}.bam" \
-    "${sample}.bam.bai"
-
-echo ""
-"""
-
+    echo ""
+    """
+}
