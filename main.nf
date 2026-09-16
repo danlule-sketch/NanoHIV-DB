@@ -7,7 +7,6 @@
  *
  * Oxford Nanopore HIV drug-resistance workflow.
  *
- *
  * STAGE 1
  *
  * POD5
@@ -20,25 +19,19 @@
  *   ↓
  * NanoQ
  *   │
- *   ├──────────────────────────────┐
- *   │                              │
- *   ▼                              ▼
- * Medaka                         Minimap2
- *   │                              │
- *   ▼                              ▼
- * Consensus FASTA                BAM + BAI
+ *   ├──→ Medaka
+ *   │      ↓
+ *   │   Consensus
  *   │
- *   └──→ Human checkpoint
+ *   ├──→ Minimap2
+ *   │      ↓
+ *   │   BAM + BAI
+ *   │
+ *   └──→ CodFreq
+ *          ↓
+ *      Codon frequencies
  *
- *
- * NanoQ FASTQ also feeds CodFreq independently:
- *
- * NanoQ FASTQ
- *   ↓
- * CodFreq
- *   ↓
- * Codon-frequency results
- *
+ * Human checkpoint occurs after consensus generation.
  *
  * STAGE 2
  *
@@ -69,9 +62,7 @@ params.consensus = null
 params.metadata = null
 
 params.outdir = 'results'
-
 params.threads = 8
-
 params.device = 'auto'
 
 
@@ -81,11 +72,8 @@ params.device = 'auto'
  * ============================================================
  */
 
-params.dorado_model =
-    'dna_r10.4.1_e8.2_400bps_sup@v5.2.0'
-
-params.kit_name =
-    'SQK-NBD114-96'
+params.dorado_model = 'dna_r10.4.1_e8.2_400bps_sup@v5.2.0'
+params.kit_name = 'SQK-NBD114-96'
 
 
 /*
@@ -138,8 +126,7 @@ params.codfreq_profile =
  * ============================================================
  */
 
-params.medaka_model =
-    'r1041_e82_400bps_sup_v5.2.0'
+params.medaka_model = 'r1041_e82_400bps_sup_v5.2.0'
 
 
 /*
@@ -148,8 +135,7 @@ params.medaka_model =
  * ============================================================
  */
 
-params.metadata_id_column =
-    'sample_id'
+params.metadata_id_column = 'sample_id'
 
 
 /*
@@ -217,7 +203,8 @@ process CHECKPOINT_CONSENSUS {
 
     input:
 
-    path consensus_files, stageAs: 'medaka_*.fasta'
+    path consensus_files,
+        stageAs: 'medaka_*.fasta'
 
     output:
 
@@ -255,19 +242,16 @@ process CHECKPOINT_CONSENSUS {
 
                 echo "Adding: \$f"
                 cat "\$f" >> consensus.fasta
-
                 ;;
 
             *)
 
                 echo "Skipping non-FASTA file: \$f"
-
                 ;;
 
         esac
 
     done
-
 
     if [[ ! -s consensus.fasta ]]; then
 
@@ -281,10 +265,10 @@ process CHECKPOINT_CONSENSUS {
 
     fi
 
-
     python3 - <<'PY'
 
 from pathlib import Path
+
 
 input_file = Path("consensus.fasta")
 output_file = Path("consensus.normalised.fasta")
@@ -321,7 +305,6 @@ with input_file.open() as fh:
         else:
 
             sequence.append(line)
-
 
     if current_id is not None:
 
@@ -371,7 +354,9 @@ with output_file.open("w") as out:
 
         for i in range(0, len(sequence), 80):
 
-            out.write(sequence[i:i + 80] + chr(10))
+            out.write(
+                sequence[i:i + 80] + chr(10)
+            )
 
 
 print(
@@ -380,15 +365,12 @@ print(
 
 PY
 
-
     mv \
         consensus.normalised.fasta \
         consensus.fasta
 
-
     echo -e "sample_id\\tconsensus_file" \
         > consensus_manifest.tsv
-
 
     awk '
         /^>/ {
@@ -398,10 +380,8 @@ PY
     ' consensus.fasta \
         >> consensus_manifest.tsv
 
-
     echo -e "sample_id\\tpatient_id\\tage\\tsex\\tdate" \
         > metadata_template.tsv
-
 
     awk '
         /^>/ {
@@ -411,9 +391,7 @@ PY
     ' consensus.fasta \
         >> metadata_template.tsv
 
-
     COUNT=\$(grep -c '^>' consensus.fasta)
-
 
     echo ""
     echo "============================================================"
@@ -634,7 +612,6 @@ if missing_metadata or extra_metadata:
         for sample_id in missing_metadata:
             print(f"    {sample_id}")
 
-
     if extra_metadata:
 
         print(
@@ -643,7 +620,6 @@ if missing_metadata or extra_metadata:
 
         for sample_id in extra_metadata:
             print(f"    {sample_id}")
-
 
     raise SystemExit(
         "ERROR: Consensus and metadata identifiers "
@@ -686,11 +662,10 @@ PY
 
 workflow {
 
-
     /*
-     * ========================================================
+     * --------------------------------------------------------
      * HELP
-     * ========================================================
+     * --------------------------------------------------------
      */
 
     if (params.help) {
@@ -755,9 +730,9 @@ STAGE 2 — REPORTING
 
 
     /*
-     * ========================================================
+     * --------------------------------------------------------
      * VALIDATE STAGE
-     * ========================================================
+     * --------------------------------------------------------
      */
 
     if (!(params.stage in ['consensus', 'report'])) {
@@ -783,13 +758,12 @@ For help:
 
 
     /*
-     * ========================================================
-     * STAGE 1
-     * ========================================================
+     * --------------------------------------------------------
+     * STAGE 1 — CONSENSUS
+     * --------------------------------------------------------
      */
 
     if (params.stage == 'consensus') {
-
 
         if (!params.pod5) {
 
@@ -815,13 +789,11 @@ Missing required parameter:
             type: 'dir'
         )
 
-
         human_reference = channel.fromPath(
             params.human_ref,
             checkIfExists: true,
             type: 'file'
         )
-
 
         hiv_reference = channel.fromPath(
             params.hiv_ref,
@@ -829,13 +801,11 @@ Missing required parameter:
             type: 'file'
         )
 
-
         hiv_index = channel.fromPath(
             params.hiv_index,
             checkIfExists: true,
             type: 'file'
         )
-
 
         codfreq_profile = channel.fromPath(
             params.codfreq_profile,
@@ -857,7 +827,7 @@ Missing required parameter:
 
         /*
          * ----------------------------------------------------
-         * 2. DORADO DEMUX
+         * 2. DORADO DEMULTIPLEX
          * ----------------------------------------------------
          */
 
@@ -881,10 +851,9 @@ Missing required parameter:
         /*
          * ----------------------------------------------------
          * 4. NANOQ
-         * ----------------------------------------------------
          *
-         * NanoQ is the explicit branching point.
-         *
+         * NanoQ is the branching point for the downstream
+         * analysis arms.
          * ----------------------------------------------------
          */
 
@@ -902,10 +871,7 @@ Missing required parameter:
          *      ↓
          * Medaka
          *      ↓
-         * consensus.fasta
-         *
-         * Medaka receives FASTQ directly.
-         *
+         * Consensus FASTA
          * ====================================================
          */
 
@@ -919,39 +885,27 @@ Missing required parameter:
                 )
             }
 
-
         polished = MEDAKA(
             medaka_input
         )
 
 
         /*
-         * Collect only the Medaka consensus FASTA paths.
-         *
-		 * MEDAKA emits:
-         *
- 		 *     tuple(
-		 *         sample_id,
-		 *         consensus.fasta
-		 *     )
-		 *
- 		 * CHECKPOINT_CONSENSUS expects only filesystem paths,
- 		 * so remove the sample_id value before collecting.
- 		 */
+         * Collect the Medaka consensus FASTA files for the
+         * human checkpoint.
+         */
 
-		consensus_files = polished
-			.map { sample_id, consensus_fasta ->
-				consensus_fasta
-			}
-			.collect()
-			
-			/*
- 			 * Human checkpoint.
- 			 */
- 			 
- 			CHECKPOINT_CONSENSUS(
- 				consensus_files
- 			)
+        consensus_files = polished
+            .map { sample_id, consensus_fasta ->
+                consensus_fasta
+            }
+            .collect()
+
+
+        CHECKPOINT_CONSENSUS(
+            consensus_files
+        )
+
 
         /*
          * ====================================================
@@ -963,11 +917,6 @@ Missing required parameter:
          * Minimap2
          *      ↓
          * BAM + BAI
-         *
-         * IMPORTANT:
-         *
-         * MINIMAP2 is called ONLY ONCE.
-         *
          * ====================================================
          */
 
@@ -981,7 +930,6 @@ Missing required parameter:
                 )
             }
 
-
         alignment = MINIMAP2(
             minimap_inputs
         )
@@ -992,15 +940,9 @@ Missing required parameter:
          * ARM 3 — CODFREQ
          * ====================================================
          *
-         * CodFreq is intentionally fed from the NanoQ FASTQ
-         * channel rather than from the Minimap2 BAM channel.
+         * CodFreq receives the NanoQ FASTQ directly.
          *
-         * The CODFREQ module should therefore accept:
-         *
-         *     tuple path(reads), path(profile)
-         *
-         * and invoke fastq2codfreq.
-         *
+         * The CODFREQ module should invoke fastq2codfreq.
          * ====================================================
          */
 
@@ -1014,21 +956,19 @@ Missing required parameter:
                 )
             }
 
-
         codfreq_results = CODFREQ(
             codfreq_inputs
         )
 
 
         /*
-         * Display CodFreq outputs without making them a
-         * dependency of the consensus or Minimap2 arms.
+         * Display CodFreq outputs without making CodFreq a
+         * dependency of the consensus or Minimap2 branches.
          */
 
         codfreq_results.view {
             "CodFreq result: ${it}"
         }
-
     }
 
 
@@ -1040,7 +980,6 @@ Missing required parameter:
 
     if (params.stage == 'report') {
 
-
         if (!params.consensus) {
 
             error """
@@ -1051,7 +990,6 @@ Missing required parameter:
 
 """
         }
-
 
         if (!params.metadata) {
 
@@ -1071,7 +1009,6 @@ Missing required parameter:
             type: 'file'
         )
 
-
         metadata_input = channel.fromPath(
             params.metadata,
             checkIfExists: true,
@@ -1089,13 +1026,16 @@ Missing required parameter:
             consensus_input,
             validated_metadata
         )
-
     }
 
 
     /*
      * ========================================================
      * COMPLETION SUMMARY
+     * ========================================================
+     *
+     * Use the workflow completion object `wf` inside the
+     * onComplete closure.
      * ========================================================
      */
 
@@ -1120,7 +1060,7 @@ Missing required parameter:
         println ""
 
         println "Duration:"
-        println "    ${workflow.duration}"
+        println "    ${wf.duration}"
 
         println ""
 
@@ -1129,6 +1069,12 @@ Missing required parameter:
 
         println ""
 
+
+        /*
+         * ----------------------------------------------------
+         * STAGE 1 COMPLETION MESSAGE
+         * ----------------------------------------------------
+         */
 
         if (params.stage == 'consensus') {
 
@@ -1141,7 +1087,7 @@ Missing required parameter:
             println "    ${params.outdir}/04_nanoq/"
             println "    ${params.outdir}/05_consensus/"
             println "    ${params.outdir}/06_minimap2/"
-            println "    ${params.outdir}/08_codfreq/"
+            println "    ${params.outdir}/07_codfreq/"
 
             println ""
 
@@ -1172,27 +1118,28 @@ Missing required parameter:
             println "        --consensus ${params.outdir}/05_consensus/consensus.fasta \\"
             println "        --metadata metadata.tsv \\"
             println "        --outdir ${params.outdir}"
-
         }
 
 
+        /*
+         * ----------------------------------------------------
+         * STAGE 2 COMPLETION MESSAGE
+         * ----------------------------------------------------
+         */
+
         if (params.stage == 'report') {
 
-            if (workflow.success) {
+            if (wf.success) {
 
                 println ""
                 println "Clinical reporting completed successfully."
                 println ""
-
             }
-
         }
 
 
         println ""
         println "============================================================"
         println ""
-
     }
-
 }
