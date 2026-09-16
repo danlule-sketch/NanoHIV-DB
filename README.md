@@ -10,9 +10,9 @@ NanoHIV-DR is a Nextflow-based pipeline designed to analyse Oxford Nanopore HIV 
 3.	Remove host DNA using Removehost. This requires downloading the human reference genome either via https://github.com/jiangweiyao/SanitizeMe or directly through the Linux command wget ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/human_g1k_v37.fasta.gz
 4.	Read quality filtering using NanoQ
 5.	Consensus polishing using Medaka
-6.	Read mapping back to the polished HIV genome using Minimap2
+6.	Read mapping back to the polished HIV genome using Minimap2 to produce BAM files for further analysis.
 7.	HIV drug resistance analysis using SierraPy, a standalone installation
-8.	Codon frequency analysis using SierraPy built-in algorithm 
+8.	Codon frequency analysis using SierraPy built-in algorithm for use with the Stanford HIVdb-web
 9.	Automated HIV subtype query, phylogenetic analysis, and reporting 
 10.	The pipeline is containerised using Docker to ensure reproducibility.
 
