@@ -3,25 +3,15 @@
  * MEDAKA
  * ============================================================
  *
- * Branch 1 of the NanoHIV-DR workflow.
- *
  * Input:
  *
  *     NanoQ filtered FASTQ
  *             +
- *     HIV-1 reference FASTA
+ *     Reference sequence
  *
  * Output:
  *
  *     consensus.fasta
- *
- * Workflow:
- *
- *     NanoQ
- *       ↓
- *     MEDAKA
- *       ↓
- *     Consensus FASTA
  *
  * ============================================================
  */
@@ -32,26 +22,22 @@ process MEDAKA {
 
     cpus params.threads
 
-    publishDir "${params.outdir}/07_medaka",
+    publishDir "${params.outdir}/05_medaka",
         mode: 'copy',
         overwrite: true
 
-
     input:
 
-    tuple path(reads), path(reference)
+    tuple path(reference), path(reads)
 
 
     output:
 
-    path "consensus.fasta",
+    tuple val(reads.simpleName), path("consensus.fasta"),
         emit: consensus
 
 
     script:
-
-    def sample = reads.simpleName
-        .replaceFirst(/\.trimmed$/, '')
 
     """
     set -euo pipefail
@@ -62,7 +48,7 @@ process MEDAKA {
     echo ""
 
     echo "Sample:"
-    echo "    ${sample}"
+    echo "    ${reads.simpleName}"
     echo ""
 
     echo "Input FASTQ:"
@@ -81,16 +67,13 @@ process MEDAKA {
     echo "    ${task.cpus}"
     echo ""
 
-
-    /*
-     * --------------------------------------------------------
-     * Run Medaka
-     * --------------------------------------------------------
-     *
-     * medaka_consensus accepts the filtered FASTQ directly.
-     *
-     * --------------------------------------------------------
-     */
+    # --------------------------------------------------------
+    # Run Medaka
+    # --------------------------------------------------------
+    #
+    # medaka_consensus accepts the filtered FASTQ directly.
+    #
+    # --------------------------------------------------------
 
     medaka_consensus \
         -i "${reads}" \
@@ -100,11 +83,9 @@ process MEDAKA {
         -m "${params.medaka_model}"
 
 
-    /*
-     * --------------------------------------------------------
-     * Validate Medaka output
-     * --------------------------------------------------------
-     */
+    # --------------------------------------------------------
+    # Validate Medaka output
+    # --------------------------------------------------------
 
     if [[ ! -f medaka/consensus.fasta ]]; then
 
@@ -133,22 +114,18 @@ process MEDAKA {
     fi
 
 
-    /*
-     * --------------------------------------------------------
-     * Create standard pipeline output
-     * --------------------------------------------------------
-     */
+    # --------------------------------------------------------
+    # Create standard pipeline output
+    # --------------------------------------------------------
 
     cp \
         medaka/consensus.fasta \
         consensus.fasta
 
 
-    /*
-     * --------------------------------------------------------
-     * Validate FASTA
-     * --------------------------------------------------------
-     */
+    # --------------------------------------------------------
+    # Validate FASTA
+    # --------------------------------------------------------
 
     if ! grep -q '^>' consensus.fasta; then
 
@@ -161,11 +138,9 @@ process MEDAKA {
     fi
 
 
-    /*
-     * --------------------------------------------------------
-     * Report output
-     * --------------------------------------------------------
-     */
+    # --------------------------------------------------------
+    # Report output
+    # --------------------------------------------------------
 
     echo ""
     echo "============================================================"
@@ -178,12 +153,6 @@ process MEDAKA {
     echo ""
 
     ls -lh consensus.fasta
-
-    echo ""
-
-    echo "FASTA records:"
-
-    grep -c '^>' consensus.fasta
 
     echo ""
     """
