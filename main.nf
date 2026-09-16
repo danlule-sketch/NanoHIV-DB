@@ -8,7 +8,7 @@
  * Oxford Nanopore HIV drug-resistance workflow.
  *
  *
- * STAGE 1 — SEQUENCING / CONSENSUS
+ * STAGE 1
  *
  * POD5
  *   ↓
@@ -28,21 +28,19 @@
  *   ▼                              ▼
  * Consensus FASTA                BAM + BAI
  *   │
- *   └──→ Sierra-Local / Reporting
+ *   └──→ Human checkpoint
  *
  *
- * NanoQ also provides the input for the CodFreq arm:
+ * NanoQ FASTQ also feeds CodFreq independently:
  *
  * NanoQ FASTQ
- *   ↓
- * alignment required by CodFreq
  *   ↓
  * CodFreq
  *   ↓
  * Codon-frequency results
  *
  *
- * STAGE 2 — REPORTING
+ * STAGE 2
  *
  * consensus.fasta
  *       +
@@ -58,7 +56,7 @@
 
 /*
  * ============================================================
- * Parameters
+ * PARAMETERS
  * ============================================================
  */
 
@@ -79,7 +77,7 @@ params.device = 'auto'
 
 /*
  * ============================================================
- * Dorado
+ * DORADO
  * ============================================================
  */
 
@@ -92,7 +90,7 @@ params.kit_name =
 
 /*
  * ============================================================
- * NanoQ
+ * NANOQ
  * ============================================================
  */
 
@@ -103,7 +101,7 @@ params.max_length = 1200
 
 /*
  * ============================================================
- * Human reference
+ * HUMAN REFERENCE
  * ============================================================
  */
 
@@ -113,7 +111,7 @@ params.human_ref =
 
 /*
  * ============================================================
- * HIV reference
+ * HIV REFERENCE
  * ============================================================
  */
 
@@ -126,7 +124,7 @@ params.hiv_index =
 
 /*
  * ============================================================
- * CodFreq
+ * CODFREQ
  * ============================================================
  */
 
@@ -136,7 +134,7 @@ params.codfreq_profile =
 
 /*
  * ============================================================
- * Medaka
+ * MEDAKA
  * ============================================================
  */
 
@@ -146,7 +144,7 @@ params.medaka_model =
 
 /*
  * ============================================================
- * Metadata
+ * METADATA
  * ============================================================
  */
 
@@ -156,7 +154,7 @@ params.metadata_id_column =
 
 /*
  * ============================================================
- * Reporting
+ * REPORTING
  * ============================================================
  */
 
@@ -166,7 +164,7 @@ params.hiv_alignment =
 
 /*
  * ============================================================
- * Modules
+ * MODULES
  * ============================================================
  */
 
@@ -187,12 +185,12 @@ include {
 } from './modules/nanoq.nf'
 
 include {
-    MINIMAP2
-} from './modules/minimap2.nf'
-
-include {
     MEDAKA
 } from './modules/medaka.nf'
+
+include {
+    MINIMAP2
+} from './modules/minimap2.nf'
 
 include {
     CODFREQ
@@ -243,12 +241,11 @@ process CHECKPOINT_CONSENSUS {
     echo "============================================================"
     echo ""
 
-    echo "Collecting Medaka consensus sequences..."
-    echo ""
-
     rm -f consensus.fasta
     touch consensus.fasta
 
+    echo "Collecting Medaka consensus sequences..."
+    echo ""
 
     for f in ${consensus_files}; do
 
@@ -257,7 +254,6 @@ process CHECKPOINT_CONSENSUS {
             *.fa|*.fasta|*.fna)
 
                 echo "Adding: \$f"
-
                 cat "\$f" >> consensus.fasta
 
                 ;;
@@ -279,7 +275,7 @@ process CHECKPOINT_CONSENSUS {
         echo "ERROR: No FASTA consensus sequences were found."
         echo ""
 
-        ls -lh
+        ls -lah
 
         exit 1
 
@@ -290,10 +286,8 @@ process CHECKPOINT_CONSENSUS {
 
 from pathlib import Path
 
-
 input_file = Path("consensus.fasta")
 output_file = Path("consensus.normalised.fasta")
-
 
 records = []
 
@@ -359,13 +353,11 @@ with output_file.open("w") as out:
                 "ERROR: Encountered an empty FASTA identifier."
             )
 
-
         if sample_id in seen:
 
             raise SystemExit(
                 f"ERROR: Duplicate consensus identifier: {sample_id}"
             )
-
 
         if not sequence:
 
@@ -373,16 +365,13 @@ with output_file.open("w") as out:
                 f"ERROR: Consensus sequence is empty: {sample_id}"
             )
 
-
         seen.add(sample_id)
 
         out.write(f">{sample_id}\n")
 
         for i in range(0, len(sequence), 80):
 
-            out.write(
-                sequence[i:i + 80] + "\n"
-            )
+            out.write(sequence[i:i + 80] + "\n")
 
 
 print(
@@ -447,17 +436,11 @@ PY
     echo "============================================================"
     echo ""
 
-    echo "Complete:"
-    echo ""
-    echo "    metadata_template.tsv"
-    echo ""
-
-    echo "IMPORTANT:"
+    echo "Complete metadata_template.tsv."
     echo ""
     echo "DO NOT change the sample_id values."
     echo ""
-
-    echo "Save the completed metadata file as:"
+    echo "Save the completed file as:"
     echo ""
     echo "    metadata.tsv"
     echo ""
@@ -512,13 +495,6 @@ import csv
 CONSENSUS = "${consensus}"
 METADATA = "${metadata}"
 REQUIRED_COLUMN = "${params.metadata_id_column}"
-
-
-print("")
-print("============================================================")
-print(" VALIDATING METADATA")
-print("============================================================")
-print("")
 
 
 consensus_ids = []
@@ -590,8 +566,7 @@ with open(
 
         raise SystemExit(
             "ERROR: Metadata file must contain the "
-            f"'{REQUIRED_COLUMN}' column.\n"
-            f"Columns found: {reader.fieldnames}"
+            f"'{REQUIRED_COLUMN}' column."
         )
 
     rows = list(reader)
@@ -650,12 +625,6 @@ extra_metadata = sorted(
 
 if missing_metadata or extra_metadata:
 
-    print("")
-    print("============================================================")
-    print(" METADATA VALIDATION FAILED")
-    print("============================================================")
-    print("")
-
     if missing_metadata:
 
         print(
@@ -664,8 +633,6 @@ if missing_metadata or extra_metadata:
 
         for sample_id in missing_metadata:
             print(f"    {sample_id}")
-
-        print("")
 
 
     if extra_metadata:
@@ -677,18 +644,6 @@ if missing_metadata or extra_metadata:
         for sample_id in extra_metadata:
             print(f"    {sample_id}")
 
-        print("")
-
-
-    print(
-        f"Consensus sequences: {len(consensus_set)}"
-    )
-
-    print(
-        f"Metadata entries:    {len(metadata_set)}"
-    )
-
-    print("")
 
     raise SystemExit(
         "ERROR: Consensus and metadata identifiers "
@@ -713,34 +668,10 @@ with open(
     destination.write(contents)
 
 
-print("")
-print("============================================================")
-print(" METADATA VALIDATION PASSED")
-print("============================================================")
-print("")
-
 print(
-    f"Consensus sequences: {len(consensus_set)}"
+    f"Metadata validation passed: "
+    f"{len(consensus_set)} consensus sequences."
 )
-
-print(
-    f"Metadata entries:    {len(metadata_set)}"
-)
-
-print("")
-
-print(
-    "Every consensus sequence has exactly one "
-    "metadata row."
-)
-
-print("")
-
-print(
-    "Proceeding to clinical reporting."
-)
-
-print("")
 
 PY
     """
@@ -773,220 +704,45 @@ workflow {
 STAGE 1 — CONSENSUS / ANALYSIS
 ============================================================
 
-Run:
-
     nextflow run main.nf \\
         --stage consensus \\
         --pod5 data/pod5 \\
         --outdir results
 
 
-CPU:
-
-    nextflow run main.nf \\
-        --stage consensus \\
-        --pod5 data/pod5 \\
-        --outdir results \\
-        --device cpu
-
-
-Stage 1 performs:
+Pipeline:
 
     POD5
       ↓
-    Dorado basecalling
+    Dorado
       ↓
-    Dorado demultiplexing
+    Demultiplex
       ↓
     SanitizeMe
       ↓
     NanoQ
       │
-      ├── Medaka
-      │     ↓
-      │   Consensus FASTA
+      ├──→ Medaka
+      │      ↓
+      │   Consensus
       │
-      ├── Minimap2
-      │     ↓
+      ├──→ Minimap2
+      │      ↓
       │   BAM + BAI
       │
-      └── CodFreq
-            ↓
-        Codon-frequency results
-
-
-Outputs:
-
-    results/01_basecalled/
-
-    results/02_demultiplexed/
-
-    results/03_removehost/
-
-    results/04_nanoq/
-
-    results/05_consensus/
-
-    results/06_minimap2/
-
-    results/08_codfreq/
-
-    results/09_reports/
-
-
-The consensus checkpoint creates:
-
-    consensus.fasta
-
-    consensus_manifest.tsv
-
-    metadata_template.tsv
-
-
-Complete metadata_template.tsv without changing the
-sample_id values.
-
-Save the completed file as:
-
-    metadata.tsv
+      └──→ CodFreq
+             ↓
+         Codon frequencies
 
 
 ============================================================
 STAGE 2 — REPORTING
 ============================================================
 
-Run:
-
     nextflow run main.nf \\
         --stage report \\
         --consensus results/05_consensus/consensus.fasta \\
         --metadata metadata.tsv \\
-        --outdir results
-
-
-============================================================
-GENERAL PARAMETERS
-============================================================
-
---outdir <DIRECTORY>
-
-    Default:
-        results
-
-
---threads <INTEGER>
-
-    Default:
-        8
-
-
---device <DEVICE>
-
-    Default:
-        auto
-
-
-============================================================
-DORADO
-============================================================
-
---dorado_model <MODEL>
-
-    Default:
-        dna_r10.4.1_e8.2_400bps_sup@v5.2.0
-
-
---kit_name <KIT>
-
-    Default:
-        SQK-NBD114-96
-
-
-============================================================
-NANOQ
-============================================================
-
---min_quality <INTEGER>
-
-    Default:
-        15
-
-
---min_length <INTEGER>
-
-    Default:
-        800
-
-
---max_length <INTEGER>
-
-    Default:
-        1200
-
-
-============================================================
-HUMAN REFERENCE
-============================================================
-
---human_ref <FASTA>
-
-    Default:
-        references/Human/human_g1k_v37.fasta
-
-
-============================================================
-HIV REFERENCE
-============================================================
-
---hiv_ref <FASTA>
-
-    Default:
-        references/HIV/HXB2-pol.fasta
-
-
---hiv_index <MMI>
-
-    Default:
-        references/HIV/HXB2-pol.mmi
-
-
-============================================================
-CODFREQ
-============================================================
-
---codfreq_profile <JSON>
-
-    Default:
-        references/HIV/HIV1.json
-
-
-============================================================
-MEDAKA
-============================================================
-
---medaka_model <MODEL>
-
-    Default:
-        r1041_e82_400bps_sup_v5.2.0
-
-
-============================================================
-METADATA
-============================================================
-
---metadata_id_column <COLUMN>
-
-    Default:
-        sample_id
-
-
-============================================================
-RESUME
-============================================================
-
-    nextflow run main.nf -resume \\
-        --stage consensus \\
-        --pod5 data/pod5 \\
         --outdir results
 
 
@@ -1000,7 +756,7 @@ RESUME
 
     /*
      * ========================================================
-     * Validate stage
+     * VALIDATE STAGE
      * ========================================================
      */
 
@@ -1043,19 +799,13 @@ Missing required parameter:
 
     --pod5 <POD5_DIRECTORY>
 
-Example:
-
-    nextflow run main.nf \\
-        --stage consensus \\
-        --pod5 data/pod5
-
 """
         }
 
 
         /*
          * ----------------------------------------------------
-         * Input references
+         * INPUTS
          * ----------------------------------------------------
          */
 
@@ -1096,7 +846,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * 1. Dorado basecalling
+         * 1. DORADO BASECALL
          * ----------------------------------------------------
          */
 
@@ -1107,7 +857,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * 2. Dorado demultiplexing
+         * 2. DORADO DEMUX
          * ----------------------------------------------------
          */
 
@@ -1118,7 +868,7 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * 3. SanitizeMe
+         * 3. SANITIZEME
          * ----------------------------------------------------
          */
 
@@ -1130,19 +880,10 @@ Example:
 
         /*
          * ----------------------------------------------------
-         * 4. NanoQ
+         * 4. NANOQ
          * ----------------------------------------------------
          *
-         * THIS IS THE BRANCHING POINT.
-         *
-         * The NanoQ output is retained as a single channel
-         * and consumed independently by:
-         *
-         *     A. Medaka
-         *     B. Minimap2
-         *     C. CodFreq alignment
-         *
-         * NanoQ itself is executed only once.
+         * NanoQ is the explicit branching point.
          *
          * ----------------------------------------------------
          */
@@ -1157,16 +898,15 @@ Example:
          * ARM 1 — MEDAKA
          * ====================================================
          *
-         * NanoQ FASTQ → Medaka → consensus FASTA
+         * NanoQ FASTQ
+         *      ↓
+         * Medaka
+         *      ↓
+         * consensus.fasta
          *
-         * IMPORTANT:
+         * Medaka receives FASTQ directly.
          *
-         * The MEDAKA module must accept:
-         *
-         *     tuple(path(reads), path(reference))
-         *
-         * rather than the current BAM/reference interface.
-         * ----------------------------------------------------
+         * ====================================================
          */
 
         medaka_input = filtered
@@ -1186,11 +926,15 @@ Example:
 
 
         /*
-         * Collect consensus files for checkpoint.
+         * Collect all Medaka consensus files.
          */
 
         consensus_files = polished.collect()
 
+
+        /*
+         * Human checkpoint.
+         */
 
         CHECKPOINT_CONSENSUS(
             consensus_files
@@ -1202,11 +946,17 @@ Example:
          * ARM 2 — MINIMAP2
          * ====================================================
          *
-         * NanoQ FASTQ → Minimap2 → BAM + BAI
+         * NanoQ FASTQ
+         *      ↓
+         * Minimap2
+         *      ↓
+         * BAM + BAI
          *
-         * The BAM/BAI output is independent of Medaka.
+         * IMPORTANT:
          *
-         * ----------------------------------------------------
+         * MINIMAP2 is called ONLY ONCE.
+         *
+         * ====================================================
          */
 
         minimap_inputs = filtered
@@ -1226,110 +976,41 @@ Example:
 
 
         /*
-         * Publish/retain BAM and BAI.
-         *
-         * The exact tuple order is based on the existing
-         * workflow:
-         *
-         *     bam_file
-         *     bai_file
-         *
-         * ----------------------------------------------------
-         */
-
-        bam = alignment.map {
-            bam_file,
-            bai_file -> bam_file
-        }
-
-
-        bai = alignment.map {
-            bam_file,
-            bai_file -> bai_file
-        }
-
-
-        /*
          * ====================================================
          * ARM 3 — CODFREQ
          * ====================================================
          *
-         * The important architectural rule is that this
-         * arm starts from NanoQ, not from the Medaka or
-         * Minimap2 output channel.
+         * CodFreq is intentionally fed from the NanoQ FASTQ
+         * channel rather than from the Minimap2 BAM channel.
          *
-         * ----------------------------------------------------
+         * The CODFREQ module should therefore accept:
          *
-         * CURRENT CODFREQ MODULE:
+         *     tuple path(reads), path(profile)
          *
-         *     tuple path(bam), path(bai), path(profile)
+         * and invoke fastq2codfreq.
          *
-         * Therefore a BAM must exist before CODFREQ can run.
-         *
-         * If CODFREQ requires BAM input, this arm requires
-         * its own alignment operation:
-         *
-         *     NanoQ FASTQ
-         *          ↓
-         *     alignment for CodFreq
-         *          ↓
-         *     BAM + BAI
-         *          ↓
-         *     CodFreq
-         *
-         * This is deliberately separate from ARM 2.
-         *
-         * ----------------------------------------------------
+         * ====================================================
          */
 
-        codfreq_alignment_inputs = filtered
-            .combine(hiv_index)
-            .map { reads, index ->
-
-                tuple(
-                    index,
-                    reads
-                )
-            }
-
-
-        /*
-         * A second MINIMAP2 invocation is used here because
-         * the current CODFREQ module requires BAM + BAI.
-         *
-         * If your final CodFreq module is changed to accept
-         * NanoQ FASTQ directly, this entire alignment block
-         * can be removed.
-         */
-
-        codfreq_alignment = MINIMAP2(
-            codfreq_alignment_inputs
-        )
-
-
-        codfreq_input = codfreq_alignment
+        codfreq_inputs = filtered
             .combine(codfreq_profile)
-            .map {
-                bam_file,
-                bai_file,
-                profile ->
+            .map { reads, profile ->
 
                 tuple(
-                    bam_file,
-                    bai_file,
+                    reads,
                     profile
                 )
             }
 
 
         codfreq_results = CODFREQ(
-            codfreq_input
+            codfreq_inputs
         )
 
 
         /*
-         * Prevent unused-channel ambiguity and make the
-         * intended Stage 1 outputs explicit.
+         * Display CodFreq outputs without making them a
+         * dependency of the consensus or Minimap2 arms.
          */
 
         codfreq_results.view {
@@ -1356,13 +1037,6 @@ Missing required parameter:
 
     --consensus <CONSENSUS_FASTA>
 
-Example:
-
-    nextflow run main.nf \\
-        --stage report \\
-        --consensus results/05_consensus/consensus.fasta \\
-        --metadata metadata.tsv
-
 """
         }
 
@@ -1375,22 +1049,9 @@ Missing required parameter:
 
     --metadata <METADATA_TSV>
 
-Example:
-
-    nextflow run main.nf \\
-        --stage report \\
-        --consensus results/05_consensus/consensus.fasta \\
-        --metadata metadata.tsv
-
 """
         }
 
-
-        /*
-         * ----------------------------------------------------
-         * Consensus input
-         * ----------------------------------------------------
-         */
 
         consensus_input = channel.fromPath(
             params.consensus,
@@ -1399,12 +1060,6 @@ Example:
         )
 
 
-        /*
-         * ----------------------------------------------------
-         * Metadata input
-         * ----------------------------------------------------
-         */
-
         metadata_input = channel.fromPath(
             params.metadata,
             checkIfExists: true,
@@ -1412,23 +1067,11 @@ Example:
         )
 
 
-        /*
-         * ----------------------------------------------------
-         * Metadata validation
-         * ----------------------------------------------------
-         */
-
         validated_metadata = VALIDATE_METADATA(
             consensus_input,
             metadata_input
         )
 
-
-        /*
-         * ----------------------------------------------------
-         * Clinical reporting
-         * ----------------------------------------------------
-         */
 
         REPORT(
             consensus_input,
@@ -1456,103 +1099,78 @@ Example:
         println "============================================================"
         println " NanoHIV-DR WORKFLOW COMPLETE"
         println "============================================================"
+
         println ""
 
         println "Status:"
-        println ""
-
         println "    ${status}"
 
         println ""
 
         println "Duration:"
-        println ""
-
         println "    ${workflow.duration}"
 
         println ""
 
-        println "Completed:"
-        println ""
-
-        println "    ${workflow.complete}"
-
-        println ""
-
         println "Output directory:"
-        println ""
-
         println "    ${params.outdir}"
 
         println ""
 
 
-        if (workflow.success) {
+        if (params.stage == 'consensus') {
 
-
-            if (params.stage == 'consensus') {
-
-                println "Stage 1 outputs:"
-                println ""
-
-                println "    ${params.outdir}/01_basecalled/"
-                println "    ${params.outdir}/02_demultiplexed/"
-                println "    ${params.outdir}/03_removehost/"
-                println "    ${params.outdir}/04_nanoq/"
-                println "    ${params.outdir}/05_consensus/"
-                println "    ${params.outdir}/06_minimap2/"
-                println "    ${params.outdir}/08_codfreq/"
-                println ""
-
-                println "Human checkpoint:"
-                println ""
-
-                println "    ${params.outdir}/05_consensus/metadata_template.tsv"
-
-                println ""
-
-                println "Complete metadata_template.tsv"
-                println "without changing sample_id values."
-
-                println ""
-
-                println "Save the completed file as:"
-                println ""
-
-                println "    metadata.tsv"
-
-                println ""
-
-                println "Then run Stage 2:"
-                println ""
-
-                println "    nextflow run main.nf \\"
-                println "        --stage report \\"
-                println "        --consensus ${params.outdir}/05_consensus/consensus.fasta \\"
-                println "        --metadata metadata.tsv \\"
-                println "        --outdir ${params.outdir}"
-
-            }
-
-
-            if (params.stage == 'report') {
-
-                println "Clinical reporting completed successfully."
-
-            }
-
-        }
-        else {
-
-            println "The workflow did not complete successfully."
+            println "Stage 1 outputs:"
             println ""
 
-            if (workflow.errorMessage) {
+            println "    ${params.outdir}/01_basecalled/"
+            println "    ${params.outdir}/02_demultiplexed/"
+            println "    ${params.outdir}/03_removehost/"
+            println "    ${params.outdir}/04_nanoq/"
+            println "    ${params.outdir}/05_consensus/"
+            println "    ${params.outdir}/06_minimap2/"
+            println "    ${params.outdir}/08_codfreq/"
 
-                println "Error:"
+            println ""
+
+            println "Human checkpoint:"
+            println ""
+
+            println "    ${params.outdir}/05_consensus/metadata_template.tsv"
+
+            println ""
+
+            println "Complete metadata_template.tsv."
+            println "Do not change sample_id values."
+
+            println ""
+
+            println "Save as:"
+            println ""
+
+            println "    metadata.tsv"
+
+            println ""
+
+            println "Then run Stage 2:"
+            println ""
+
+            println "    nextflow run main.nf \\"
+            println "        --stage report \\"
+            println "        --consensus ${params.outdir}/05_consensus/consensus.fasta \\"
+            println "        --metadata metadata.tsv \\"
+            println "        --outdir ${params.outdir}"
+
+        }
+
+
+        if (params.stage == 'report') {
+
+            if (workflow.success) {
+
                 println ""
-
-                println "    ${workflow.errorMessage}"
+                println "Clinical reporting completed successfully."
+                println ""
 
             }
 
@@ -1560,7 +1178,6 @@ Example:
 
 
         println ""
-
         println "============================================================"
         println ""
 
