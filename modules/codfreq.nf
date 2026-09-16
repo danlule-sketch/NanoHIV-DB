@@ -98,7 +98,7 @@ process CODFREQ {
         echo ""
 
         echo "PATH:"
-        echo "${PATH}"
+        echo "\${PATH}"
 
         exit 1
 
