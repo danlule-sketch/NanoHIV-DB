@@ -1099,9 +1099,9 @@ Missing required parameter:
      * ========================================================
      */
 
-    workflow.onComplete {
+    workflow.onComplete { wf ->
 
-        def status = workflow.success
+        def status = wf.success
             ? 'SUCCESS'
             : 'FAILED'
 
