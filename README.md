@@ -18,7 +18,8 @@ NanoHIV-DR is a Nextflow-based pipeline designed to analyse Oxford Nanopore HIV 
 
 ## Workflow Overview
 
-<img width="301" height="412" alt="Screenshot 2026-09-16 at 12 29 06" src="https://github.com/user-attachments/assets/b1222f78-7180-4d5b-a9c8-fa674b74211e" />
+<img width="275" height="423" alt="Screenshot 2026-09-16 at 12 31 27" src="https://github.com/user-attachments/assets/ea7dc052-2816-4f51-ba6b-8180b2347dec" />
+
 
 # Requirements
 The following software must be installed:
