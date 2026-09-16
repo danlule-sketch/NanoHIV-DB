@@ -3,42 +3,35 @@
 # ============================================================
 #
 # Target architecture:
-#   linux/amd64
-#
-# Workflow:
-#
-#   POD5
-#     ↓
-#   Dorado basecalling
-#     ↓
-#   Dorado demultiplexing
-#     ↓
-#   SanitizeMe
-#     ↓
-#   NanoQ
-#     ├──→ Medaka
-#     ├──→ Minimap2 → BAM/BAI
-#     └──→ CodFreq
+#     linux/amd64
 #
 # Contains:
-#   - Dorado
-#   - minimap2
-#   - samtools
-#   - seqtk
-#   - NanoQ
-#   - Medaka
-#   - MAFFT
-#   - RAxML
-#   - BCFtools
-#   - SanitizeMe
-#   - CodFreq
-#   - Python
-#   - NanoHIV-DR reporting scripts
+#
+#   Oxford Nanopore
+#     - Dorado
+#     - minimap2
+#     - samtools
+#     - seqtk
+#     - NanoQ
+#     - Medaka
+#
+#   Host removal
+#     - SanitizeMe
+#
+#   HIV analysis
+#     - CodFreq
+#     - MAFFT
+#     - RAxML
+#     - BCFtools
+#
+#   Reporting
+#     - Python
+#     - Bash
+#     - NanoHIV-DR REPORT scripts
 #
 # ============================================================
 
 FROM mambaorg/micromamba:latest
-
 
 # ============================================================
 # Base configuration
@@ -47,11 +40,9 @@ FROM mambaorg/micromamba:latest
 USER root
 
 ENV DEBIAN_FRONTEND=noninteractive
-
 ENV MAMBA_ROOT_PREFIX=/opt/conda
 
-ENV PATH="/opt/dorado/bin:/opt/REPORT:/opt/REPORT/bin:/opt/conda/bin:/opt/conda/envs/codfreq/bin:${PATH}"
-
+ENV PATH="/opt/conda/bin:/opt/conda/envs/codfreq/bin:/opt/dorado/bin:/opt/codfreq/bin:/opt/REPORT:/opt/REPORT/bin:${PATH}"
 
 # ============================================================
 # System packages
@@ -65,6 +56,7 @@ RUN apt-get update && \
         git \
         python3 \
         python3-pip \
+        python3-dev \
         unzip \
         tar \
         gzip \
@@ -82,16 +74,21 @@ RUN apt-get update && \
         g++ \
         make \
         zlib1g-dev \
+        libbz2-dev \
+        liblzma-dev \
+        libncurses5-dev \
+        libcurl4-openssl-dev \
+        pkg-config \
     && \
     rm -rf /var/lib/apt/lists/*
 
-
 # ============================================================
-# Main bioinformatics environment
+# Bioinformatics software
 # ============================================================
 #
-# Everything that is used directly by the Nextflow modules
-# is installed into the base micromamba environment.
+# These programs are installed in the base micromamba
+# environment and therefore are available to Nextflow
+# processes using the container.
 #
 # ============================================================
 
@@ -111,9 +108,13 @@ RUN micromamba install -y \
     && \
     micromamba clean --all --yes
 
-
 # ============================================================
-# Dedicated CodFreq environment
+# CodFreq environment
+# ============================================================
+#
+# CodFreq is kept in its own Python environment because it
+# has specific Python/build dependencies.
+#
 # ============================================================
 
 RUN micromamba create -y \
@@ -127,9 +128,9 @@ RUN micromamba create -y \
         gcc \
         gxx \
         make \
+        pkg-config \
     && \
     micromamba clean --all --yes
-
 
 # ============================================================
 # Download CodFreq source
@@ -140,9 +141,13 @@ RUN git clone \
     https://github.com/hivdb/codfreq.git \
     /tmp/codfreq
 
-
 # ============================================================
 # CodFreq Python dependencies
+# ============================================================
+#
+# These versions follow the dependency versions used by the
+# CodFreq project.
+#
 # ============================================================
 
 RUN micromamba run -n codfreq \
@@ -163,7 +168,6 @@ RUN micromamba run -n codfreq \
         "urllib3==2.0.4" \
         "xopen==1.7.0"
 
-
 # ============================================================
 # post-align
 # ============================================================
@@ -173,9 +177,15 @@ RUN micromamba run -n codfreq \
     --no-cache-dir \
     "https://github.com/hivdb/post-align/archive/cb28b83e2d9639960533f805f7dc2612ea63ddc6.zip"
 
-
 # ============================================================
-# Build and install CodFreq
+# Install CodFreq
+# ============================================================
+#
+# Do NOT assume a particular executable name such as
+# sam2codfreq.
+#
+# The package installs its own command-line scripts.
+#
 # ============================================================
 
 RUN cd /tmp/codfreq && \
@@ -185,33 +195,69 @@ RUN cd /tmp/codfreq && \
     --ignore-installed \
     .
 
+# ============================================================
+# CodFreq executable discovery
+# ============================================================
+#
+# Show exactly which CodFreq commands were installed.
+# This avoids the previous build failure caused by assuming
+# that sam2codfreq exists.
+#
+# ============================================================
+
+RUN echo "============================================================" && \
+    echo "CodFreq installed executables" && \
+    echo "============================================================" && \
+    ls -lah /opt/conda/envs/codfreq/bin/ && \
+    echo "" && \
+    find /opt/conda/envs/codfreq/bin \
+        -maxdepth 1 \
+        -type f \
+        -perm /111 \
+        -printf '%f\n' \
+        | sort
 
 # ============================================================
-# Make CodFreq executable available globally
+# Verify CodFreq Python package
+# ============================================================
+
+RUN micromamba run -n codfreq \
+    python -c \
+    "import codfreq; print('CodFreq Python package:', codfreq.__file__)"
+
+# ============================================================
+# Verify CodFreq command-line programs
 # ============================================================
 #
-# This avoids relying on micromamba environment activation
-# inside Nextflow processes.
+# fastq2codfreq is the command expected for the FASTQ branch.
 #
+# We test for it without hard-coding sam2codfreq.
+#
+# ============================================================
+
+RUN if [ -x /opt/conda/envs/codfreq/bin/fastq2codfreq ]; then \
+        echo "fastq2codfreq found"; \
+        /opt/conda/envs/codfreq/bin/fastq2codfreq --help >/dev/null; \
+    else \
+        echo "ERROR: fastq2codfreq was not installed"; \
+        echo "Installed CodFreq commands:"; \
+        find /opt/conda/envs/codfreq/bin \
+            -maxdepth 1 \
+            -type f \
+            -perm /111 \
+            -printf '%f\n' \
+            | sort; \
+        exit 1; \
+    fi
+
+# ============================================================
+# Make CodFreq executable available in PATH
 # ============================================================
 
 RUN mkdir -p /opt/codfreq/bin && \
     ln -sf \
-        /opt/conda/envs/codfreq/bin/sam2codfreq \
-        /opt/codfreq/bin/sam2codfreq
-
-
-# ============================================================
-# Verify CodFreq
-# ============================================================
-
-RUN test -x /opt/conda/envs/codfreq/bin/sam2codfreq
-
-RUN /opt/conda/envs/codfreq/bin/sam2codfreq --help >/dev/null
-
-RUN /opt/conda/envs/codfreq/bin/python \
-    -c "import codfreq.sam2codfreq; print(codfreq.sam2codfreq.__file__)"
-
+        /opt/conda/envs/codfreq/bin/fastq2codfreq \
+        /opt/codfreq/bin/fastq2codfreq
 
 # ============================================================
 # Remove CodFreq source
@@ -219,6 +265,27 @@ RUN /opt/conda/envs/codfreq/bin/python \
 
 RUN rm -rf /tmp/codfreq
 
+# ============================================================
+# Additional CodFreq runtime tools
+# ============================================================
+#
+# The current CodFreq workflow uses alignment/processing
+# utilities including minimap2, samtools and fastp.
+#
+# minimap2 and samtools are already available in the base
+# environment.
+#
+# Install fastp into the base environment.
+#
+# ============================================================
+
+RUN micromamba install -y \
+    -n base \
+    -c conda-forge \
+    -c bioconda \
+        fastp \
+    && \
+    micromamba clean --all --yes
 
 # ============================================================
 # Dorado
@@ -227,7 +294,6 @@ RUN rm -rf /tmp/codfreq
 COPY containers/dorado-linux-x64 /opt/dorado
 
 RUN chmod +x /opt/dorado/bin/dorado
-
 
 # ============================================================
 # NanoHIV-DR reporting software
@@ -243,13 +309,29 @@ RUN chmod +x /opt/REPORT/preprocessing.sh && \
             -exec chmod +x {} \; ; \
     fi
 
+# ============================================================
+# Report Python dependencies
+# ============================================================
+#
+# The reporting scripts use the system Python installation.
+#
+# requirements.txt is optional. If it exists in REPORT,
+# install those dependencies.
+#
+# ============================================================
+
+RUN if [ -f /opt/REPORT/requirements.txt ]; then \
+        python3 -m pip install \
+            --no-cache-dir \
+            -r /opt/REPORT/requirements.txt; \
+    fi
 
 # ============================================================
-# Final executable checks
+# Final container checks
 # ============================================================
 
 RUN echo "============================================================" && \
-    echo "NanoHIV-DR container" && \
+    echo " NanoHIV-DR container verification" && \
     echo "============================================================" && \
     echo "" && \
     echo "System Python:" && \
@@ -258,13 +340,13 @@ RUN echo "============================================================" && \
     echo "CodFreq Python:" && \
     /opt/conda/envs/codfreq/bin/python --version && \
     echo "" && \
-    echo "CodFreq module:" && \
+    echo "CodFreq package:" && \
     /opt/conda/envs/codfreq/bin/python \
-        -c "import codfreq.sam2codfreq; print(codfreq.sam2codfreq.__file__)" && \
+        -c "import codfreq; print(codfreq.__file__)" && \
     echo "" && \
-    echo "sam2codfreq:" && \
-    /opt/conda/envs/codfreq/bin/sam2codfreq --help >/dev/null && \
-    echo "sam2codfreq OK" && \
+    echo "fastq2codfreq:" && \
+    /opt/conda/envs/codfreq/bin/fastq2codfreq --help >/dev/null && \
+    echo "fastq2codfreq OK" && \
     echo "" && \
     echo "Dorado:" && \
     /opt/dorado/bin/dorado --version && \
@@ -298,19 +380,20 @@ RUN echo "============================================================" && \
         SanitizeMe_CLI.py -h >/dev/null && \
     echo "SanitizeMe_CLI.py OK" && \
     echo "" && \
-    echo "Reporting:" && \
+    echo "fastp:" && \
+    micromamba run -n base fastp --version && \
+    echo "" && \
+    echo "REPORT:" && \
     test -x /opt/REPORT/preprocessing.sh && \
     echo "/opt/REPORT/preprocessing.sh OK" && \
     echo "" && \
     echo "============================================================"
-
 
 # ============================================================
 # Working directory
 # ============================================================
 
 WORKDIR /data
-
 
 # ============================================================
 # Default command
