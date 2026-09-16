@@ -926,20 +926,32 @@ Missing required parameter:
 
 
         /*
-         * Collect all Medaka consensus files.
-         */
+         * Collect only the Medaka consensus FASTA paths.
+         *
+		 * MEDAKA emits:
+         *
+ 		 *     tuple(
+		 *         sample_id,
+		 *         consensus.fasta
+		 *     )
+		 *
+ 		 * CHECKPOINT_CONSENSUS expects only filesystem paths,
+ 		 * so remove the sample_id value before collecting.
+ 		 */
 
-        consensus_files = polished.collect()
-
-
-        /*
-         * Human checkpoint.
-         */
-
-        CHECKPOINT_CONSENSUS(
-            consensus_files
-        )
-
+		consensus_files = polished
+			.map { sample_id, consensus_fasta ->
+				consensus_fasta
+			}
+			.collect()
+			
+			/*
+ 			 * Human checkpoint.
+ 			 */
+ 			 
+ 			CHECKPOINT_CONSENSUS(
+ 				consensus_files
+ 			)
 
         /*
          * ====================================================
