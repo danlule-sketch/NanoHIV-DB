@@ -89,9 +89,10 @@ docker image inspect nanohiv-dr-cpu:latest \
 
 ## 1. Nanopore POD5 data
 
-```
-data/pod5/
-```
+The folder path ```data/pod5/ ``` contains a POD5 file for performing test runs. 
+### Note
+
+The POD5 file was filtered from a larger file for quick testing.
 
 ## 2. Patient metadata table
 
